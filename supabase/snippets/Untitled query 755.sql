@@ -1,0 +1,1 @@
+SELECT * FROM allocate_contiguous_ips((SELECT id FROM subnets WHERE name = 'Gap Subnet' LIMIT 1), 2, 'Final Test', (SELECT id FROM profiles LIMIT 1));

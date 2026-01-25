@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(code:*)",
+      "Bash(pacman:*)",
+      "Bash(npx create-next-app:*)",
+      "Bash(sudo pacman:*)",
+      "Bash(sudo -S pacman -S:*)",
+      "Bash(node --version)",
+      "Bash(docker --version:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm install:*)"
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+services:
+  # Next.js Development Server with Hot Reload
+  app:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+      - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY}
+    networks:
+      - ipam-network
+
+  # Local PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ipam}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ipam_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-ipam}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ipam}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ipam-network
+
+networks:
+  ipam-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

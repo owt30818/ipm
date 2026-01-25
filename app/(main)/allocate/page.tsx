@@ -1,0 +1,84 @@
+import { createClient } from "@/lib/supabase/server";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AllocateForm } from "./allocate-form";
+import { CsvUpload } from "./csv-upload";
+import { SubnetForm } from "./subnet-form";
+
+async function getSubnets() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("subnets")
+    .select("*")
+    .order("name");
+
+  if (error) {
+    console.error("Error fetching subnets:", error);
+    return [];
+  }
+
+  return data ?? [];
+}
+
+export default async function AllocatePage() {
+  const subnets = await getSubnets();
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">IP 할당</h1>
+        <p className="text-muted-foreground">IP 주소를 할당하고 관리하세요</p>
+      </div>
+
+      <Tabs defaultValue="single" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3 md:w-auto md:inline-grid">
+          <TabsTrigger value="single">단일 할당</TabsTrigger>
+          <TabsTrigger value="bulk">CSV 업로드</TabsTrigger>
+          <TabsTrigger value="subnet">서브넷 관리</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="single">
+          <Card>
+            <CardHeader>
+              <CardTitle>IP 주소 할당</CardTitle>
+              <CardDescription>
+                새로운 IP 주소를 등록하거나 할당하세요
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AllocateForm subnets={subnets} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="bulk">
+          <Card>
+            <CardHeader>
+              <CardTitle>CSV 대량 업로드</CardTitle>
+              <CardDescription>
+                CSV 파일로 여러 IP 주소를 한 번에 등록하세요
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CsvUpload subnets={subnets} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="subnet">
+          <Card>
+            <CardHeader>
+              <CardTitle>서브넷 관리</CardTitle>
+              <CardDescription>
+                IP 주소를 그룹화할 서브넷을 관리하세요
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SubnetForm subnets={subnets} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

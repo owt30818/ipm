@@ -1,0 +1,40 @@
+services:
+  # Next.js Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+      - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY}
+    restart: unless-stopped
+    networks:
+      - ipam-network
+
+  # Optional: Local PostgreSQL for development
+  # Uncomment if you want to use local DB instead of Supabase
+  # db:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     POSTGRES_USER: ${POSTGRES_USER:-ipam}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ipam_secret}
+  #     POSTGRES_DB: ${POSTGRES_DB:-ipam}
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #     - ./supabase/migrations:/docker-entrypoint-initdb.d
+  #   restart: unless-stopped
+  #   networks:
+  #     - ipam-network
+
+networks:
+  ipam-network:
+    driver: bridge
+
+# volumes:
+#   postgres_data:
