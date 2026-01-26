@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -40,9 +41,12 @@ export function Header({ userEmail }: HeaderProps) {
         </div>
         <div className="flex items-center gap-4">
           {userEmail && (
-            <span className="hidden sm:block text-sm text-muted-foreground">
+            <Link
+              href="/settings"
+              className="hidden sm:block text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
               {userEmail}
-            </span>
+            </Link>
           )}
           <Button variant="outline" size="sm" onClick={handleLogout}>
             로그아웃
