@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { allocateIps } from "@/app/actions/allocate-ips";
+import { getNextAvailableIp } from "@/app/actions/get-next-available-ip";
 import { Subnet, IpAddressInsert } from "@/lib/types/database";
 
 interface AllocateFormProps {
@@ -33,8 +34,34 @@ export function AllocateForm({ subnets }: AllocateFormProps) {
   const [description, setDescription] = useState("");
   const [allocatedTo, setAllocatedTo] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingIp, setIsFetchingIp] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+
+  const handleSubnetChange = useCallback(async (newSubnetId: string) => {
+    setSubnetId(newSubnetId);
+
+    // 단일 할당 모드일 때만 다음 가용 IP 자동 채움
+    if (allocationMode === "single" && newSubnetId) {
+      setIsFetchingIp(true);
+      try {
+        const result = await getNextAvailableIp(newSubnetId);
+        if (result.ip) {
+          setIpAddress(result.ip);
+        } else if (result.error) {
+          toast({
+            title: "알림",
+            description: result.error,
+            variant: "destructive",
+          });
+        }
+      } catch {
+        // 에러 무시
+      } finally {
+        setIsFetchingIp(false);
+      }
+    }
+  }, [allocationMode, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,14 +130,26 @@ export function AllocateForm({ subnets }: AllocateFormProps) {
           title: "등록 완료",
           description: `${ipAddress} 주소가 등록되었습니다.`,
         });
+
+        // 단일 할당 후 다음 가용 IP 자동 갱신
+        if (subnetId) {
+          const result = await getNextAvailableIp(subnetId);
+          if (result.ip) {
+            setIpAddress(result.ip);
+          } else {
+            setIpAddress("");
+          }
+        }
       }
 
-      // Reset form
-      setIpAddress("");
+      // Reset form (IP는 위에서 처리)
+      if (allocationMode === "auto") {
+        setIpAddress("");
+      }
       setQuantity(1);
       setDescription("");
       setAllocatedTo("");
-      setStatus("available");
+      setStatus("allocated");
 
       router.refresh();
     } catch (error) {
@@ -138,7 +177,7 @@ export function AllocateForm({ subnets }: AllocateFormProps) {
 
       <div className="space-y-2">
         <label className="text-sm font-medium">서브넷</label>
-        <Select value={subnetId} onValueChange={setSubnetId}>
+        <Select value={subnetId} onValueChange={handleSubnetChange}>
           <SelectTrigger>
             <SelectValue placeholder="서브넷을 선택하세요" />
           </SelectTrigger>
@@ -164,13 +203,16 @@ export function AllocateForm({ subnets }: AllocateFormProps) {
             <label className="text-sm font-medium">IP 주소</label>
             <Input
               type="text"
-              placeholder="192.168.1.100"
+              placeholder={isFetchingIp ? "다음 가용 IP 조회 중..." : "192.168.1.100"}
               value={ipAddress}
               onChange={(e) => setIpAddress(e.target.value)}
               pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
               title="올바른 IPv4 주소를 입력하세요"
-              disabled={isLoading}
+              disabled={isLoading || isFetchingIp}
             />
+            <p className="text-xs text-muted-foreground">
+              서브넷 선택 시 다음 가용 IP가 자동으로 채워집니다.
+            </p>
           </div>
 
           <div className="space-y-2">

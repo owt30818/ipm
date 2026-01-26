@@ -8,7 +8,7 @@ IP Address Management (IPAM) SaaS application with mobile-first responsive desig
 
 ## Tech Stack
 
-- **Framework:** Next.js 16 (App Router)
+- **Framework:** Next.js 15 (App Router)
 - **Language:** TypeScript
 - **Auth:** Supabase Auth
 - **UI:** Tailwind CSS + Shadcn/ui
@@ -19,78 +19,101 @@ IP Address Management (IPAM) SaaS application with mobile-first responsive desig
 ## Build & Development Commands
 
 ```bash
-# Install dependencies
-npm install
-
-# Run development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Run linter
-npm run lint
-
-# Install Shadcn/ui components
-npx shadcn@latest add sheet drawer button input select card table badge dialog alert-dialog toast tabs textarea separator label
+npm install          # Install dependencies
+npm run dev          # Run development server (localhost:3000)
+npm run build        # Build for production
+npm run lint         # Run ESLint
 ```
 
-## Docker Commands
+### Supabase CLI
 
 ```bash
-# Development with hot reload (includes local PostgreSQL)
-docker compose -f docker-compose.dev.yml up
-
-# Production build and run
-docker compose up --build
-
-# Stop containers
-docker compose down
+npx supabase start                    # Start local Supabase
+npx supabase db reset                 # Reset DB and apply migrations
+npx supabase migration new <name>     # Create new migration
+npx supabase gen types typescript --local > lib/types/database.ts  # Regenerate types
 ```
+
+### Docker
+
+```bash
+docker compose -f docker-compose.dev.yml up   # Dev with hot reload + local PostgreSQL
+docker compose up --build                     # Production build
+```
+
+## Environment Setup
+
+Copy `.env.example` to `.env.local` and configure:
+- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase project credentials
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` - Cloudflare Turnstile keys
 
 ## Architecture
 
-### Responsive Layout Strategy
+### Folder Structure
 
-- **Desktop:** Fixed left sidebar navigation
-- **Mobile:** Hidden sidebar with hamburger menu triggering a Sheet/Drawer component
-- Use Tailwind breakpoints: `hidden md:block` (desktop), `block md:hidden` (mobile)
+```
+app/
+  (auth)/          # Login/signup pages (public)
+  (main)/          # Protected pages (dashboard, allocate, settings)
+  actions/         # Server Actions (allocate-ips, bulk-update-ips, bulk-delete-ips)
+  api/             # API routes
+components/
+  auth/            # Login/signup forms with Turnstile
+  layout/          # Header, Sidebar, MobileNav
+  ip/              # IP detail dialog, audit log list
+  ui/              # Shadcn/ui primitives
+lib/
+  supabase/
+    client.ts      # Browser client (use in Client Components)
+    server.ts      # Server client (use in Server Components/Actions)
+  types/
+    database.ts    # Supabase generated types
+```
 
-### Key Pages
+### Supabase Client Usage
+
+- **Server Components / Server Actions:** `import { createClient } from "@/lib/supabase/server"`
+- **Client Components:** `import { createClient } from "@/lib/supabase/client"`
+
+### Server Actions Pattern
+
+Server Actions are in `app/actions/`. They use `"use server"` directive and handle auth internally:
+```typescript
+const supabase = await createClient();
+const { data: { user } } = await supabase.auth.getUser();
+```
+
+### Database RPC Functions
+
+- `allocate_contiguous_ips(p_subnet_id, p_quantity, p_description, p_user_id)` - Allocates N contiguous available IPs with row-level locking
+
+### Database Schema
+
+| Table | Key Columns |
+|-------|-------------|
+| profiles | id (FK auth.users), email, role (admin/sub_admin/user) |
+| subnets | cidr (CIDR type), name, created_by |
+| ip_addresses | subnet_id, ip_address (INET), status (available/allocated/reserved/deprecated), allocated_to |
+| audit_logs | ip_address_id, user_id, action_type, old_value (JSONB), new_value (JSONB) |
+
+Row Level Security (RLS) is enabled. Use `get_my_role()` function for role checks in policies.
+
+### Responsive Layout
+
+- **Desktop:** Fixed left sidebar (`hidden md:block`)
+- **Mobile:** Hamburger menu → Sheet/Drawer (`block md:hidden`)
+
+### Key Routes
 
 | Route | Purpose |
 |-------|---------|
-| `/allocate` | IP management and allocation (input-focused) |
-| `/dashboard` | Search and status overview (output-focused) |
+| `/allocate` | IP allocation forms (subnet selection, quantity input, CSV upload) |
+| `/dashboard` | IP search and status overview with filtering |
+| `/settings` | User management and audit log viewer (admin only) |
 
-### Database Schema (PostgreSQL)
+## UI Patterns
 
-```
-profiles       → id, email, role
-subnets        → id, cidr, name
-ip_addresses   → id, subnet_id, ip_address(INET), status, description, allocated_at
-audit_logs     → id, ip_address_id, user_id, action_type, old_value, new_value, created_at
-```
-
-## UI/UX Requirements
-
-### Mobile-First Patterns (Critical)
-
-1. **Drawer/Sheet Components:** Always use Shadcn/ui `Sheet` and `Drawer` for mobile navigation and detail views
-2. **Bottom Sheet for Details:** On mobile, tapping a list item opens a bottom sheet (not a new page) showing details + audit log
-3. **Full-Width Buttons:** Primary action buttons must be full-width or in a sticky bottom bar on mobile
-4. **Numeric Inputs:** Use `type="number"` for quantity fields to trigger numeric keyboard
-5. **Data Display:**
-   - Desktop: Standard data tables
-   - Mobile: Card-based list view with IP address + status badge on top, description + subnet below
-
-### CSV Handling
-
-- Desktop: Drag & drop zone
-- Mobile: Standard file picker button
-
-### Security
-
-- Cloudflare Turnstile on login/signup forms
-- JWT session management
-- RBAC with admin/sub-admin roles
+- **Mobile details:** Bottom Sheet (not new page) for IP details + audit log
+- **Data tables:** Desktop uses `<Table>`, mobile uses card-based list
+- **CSV upload:** Drag & drop on desktop, file picker button on mobile
+- **Auth forms:** Include Cloudflare Turnstile widget

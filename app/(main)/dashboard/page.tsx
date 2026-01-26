@@ -1,10 +1,10 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { IpAddressTable } from "./ip-address-table";
 import { IpAddressList } from "./ip-address-list";
 import { PaginationControl } from "@/components/pagination-control";
+import { SearchFilters } from "./search-filters";
 
 async function getStats() {
   const supabase = await createClient();
@@ -36,11 +36,25 @@ async function getStats() {
   };
 }
 
-async function getIpAddresses(
-  search?: string,
-  page: number = 1,
-  limit: number = 50
-) {
+async function getSubnets() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("subnets")
+    .select("id, name, cidr")
+    .order("name");
+  return data ?? [];
+}
+
+interface FilterParams {
+  status?: string;
+  subnetId?: string;
+  description?: string;
+  page?: number;
+  limit?: number;
+}
+
+async function getIpAddresses(filters: FilterParams) {
+  const { status, subnetId, description, page = 1, limit = 50 } = filters;
   const supabase = await createClient();
 
   let query = supabase
@@ -52,11 +66,22 @@ async function getIpAddresses(
     `,
       { count: "exact" }
     )
-    .order("created_at", { ascending: false });
+    .order("ip_address", { ascending: true });
 
-  if (search) {
+  // 상태 필터
+  if (status) {
+    query = query.eq("status", status);
+  }
+
+  // 서브넷 필터
+  if (subnetId) {
+    query = query.eq("subnet_id", subnetId);
+  }
+
+  // 설명/할당대상 검색 (텍스트 필드만)
+  if (description) {
     query = query.or(
-      `ip_address.ilike.%${search}%,description.ilike.%${search}%,allocated_to.ilike.%${search}%`
+      `description.ilike.%${description}%,allocated_to.ilike.%${description}%`
     );
   }
 
@@ -79,16 +104,25 @@ async function getIpAddresses(
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; page?: string; limit?: string }>;
+  searchParams: Promise<{
+    status?: string;
+    subnet?: string;
+    description?: string;
+    page?: string;
+    limit?: string
+  }>;
 }) {
   const resolvedSearchParams = await searchParams;
-  const search = resolvedSearchParams.search;
+  const status = resolvedSearchParams.status;
+  const subnetId = resolvedSearchParams.subnet;
+  const description = resolvedSearchParams.description;
   const page = Number(resolvedSearchParams.page) || 1;
   const limit = Number(resolvedSearchParams.limit) || 50;
 
-  const [stats, { data: ipAddresses, count }] = await Promise.all([
+  const [stats, subnets, { data: ipAddresses, count }] = await Promise.all([
     getStats(),
-    getIpAddresses(search, page, limit),
+    getSubnets(),
+    getIpAddresses({ status, subnetId, description, page, limit }),
   ]);
 
   return (
@@ -142,21 +176,13 @@ export default async function DashboardPage({
         </Card>
       </div>
 
-      {/* Search */}
+      {/* Search Filters */}
       <Card>
         <CardHeader>
           <CardTitle>IP 주소 검색</CardTitle>
         </CardHeader>
         <CardContent>
-          <form>
-            <Input
-              name="search"
-              placeholder="IP 주소, 설명, 할당 대상으로 검색..."
-              defaultValue={search}
-              className="max-w-md"
-            />
-            {/* hidden inputs to preserve pagination state if needed, or better, reset to page 1 on search */}
-          </form>
+          <SearchFilters subnets={subnets} />
         </CardContent>
       </Card>
 

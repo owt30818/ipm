@@ -15,6 +15,9 @@ DECLARE
   v_target_ids UUID[];
   v_current_ip INET;
 BEGIN
+  -- Disable RLS for this function
+  SET LOCAL row_security = off;
+
   -- Validate inputs
   IF p_quantity <= 0 THEN
     RAISE EXCEPTION 'Quantity must be positive';

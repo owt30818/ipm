@@ -21,8 +21,12 @@ interface CsvUploadProps {
 }
 
 interface CsvRow {
+  [key: string]: string;
+}
+
+interface ParsedIpRow {
   ip_address: string;
-  status?: string;
+  status: IpStatus;
   description?: string;
   allocated_to?: string;
 }
@@ -36,13 +40,51 @@ function parseStatus(status?: string): IpStatus {
   if (trimmed && validStatuses.includes(trimmed as IpStatus)) {
     return trimmed as IpStatus;
   }
-  return "available";
+  return "allocated"; // 기본값을 allocated로 변경
+}
+
+// IP 주소 패턴 검증
+const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+
+function isValidIp(str: string): boolean {
+  const trimmed = str?.trim();
+  if (!trimmed || !ipPattern.test(trimmed)) return false;
+  const parts = trimmed.split(".").map(Number);
+  return parts.every((p) => p >= 0 && p <= 255);
+}
+
+// CSV 행을 파싱하여 IP 데이터로 변환
+function parseCsvRow(row: CsvRow, headers: string[]): ParsedIpRow | null {
+  // 헤더가 있는 경우 (ip_address 컬럼)
+  if (row.ip_address && isValidIp(row.ip_address)) {
+    return {
+      ip_address: row.ip_address.trim(),
+      status: parseStatus(row.status),
+      description: row.description?.trim() || undefined,
+      allocated_to: row.allocated_to?.trim() || undefined,
+    };
+  }
+
+  // 첫 번째 컬럼이 IP인 경우 (헤더 없거나 다른 헤더명)
+  const firstKey = headers[0];
+  const firstValue = row[firstKey];
+  if (firstValue && isValidIp(firstValue)) {
+    const secondKey = headers[1];
+    const description = secondKey ? row[secondKey]?.trim() : undefined;
+    return {
+      ip_address: firstValue.trim(),
+      status: "allocated",
+      description: description || undefined,
+    };
+  }
+
+  return null;
 }
 
 export function CsvUpload({ subnets }: CsvUploadProps) {
   const [subnetId, setSubnetId] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<CsvRow[]>([]);
+  const [preview, setPreview] = useState<ParsedIpRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,7 +97,11 @@ export function CsvUpload({ subnets }: CsvUploadProps) {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        setPreview(results.data.slice(0, 5));
+        const headers = results.meta.fields || [];
+        const parsed = results.data
+          .map((row) => parseCsvRow(row, headers))
+          .filter((r): r is ParsedIpRow => r !== null);
+        setPreview(parsed.slice(0, 5));
       },
       error: (error) => {
         toast({
@@ -112,7 +158,10 @@ export function CsvUpload({ subnets }: CsvUploadProps) {
         header: true,
         skipEmptyLines: true,
         complete: async (results) => {
-          const rows = results.data.filter((row) => row.ip_address);
+          const headers = results.meta.fields || [];
+          const rows = results.data
+            .map((row) => parseCsvRow(row, headers))
+            .filter((r): r is ParsedIpRow => r !== null);
 
           if (rows.length === 0) {
             toast({
@@ -126,10 +175,10 @@ export function CsvUpload({ subnets }: CsvUploadProps) {
 
           const insertData: IpAddressInsert[] = rows.map((row) => ({
             subnet_id: subnetId,
-            ip_address: row.ip_address.trim(),
-            status: parseStatus(row.status),
-            description: row.description?.trim() || undefined,
-            allocated_to: row.allocated_to?.trim() || undefined,
+            ip_address: row.ip_address,
+            status: row.status,
+            description: row.description,
+            allocated_to: row.allocated_to,
           }));
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -279,7 +328,7 @@ export function CsvUpload({ subnets }: CsvUploadProps) {
                       {row.ip_address}
                     </td>
                     <td className="px-3 py-2 border-b">
-                      {row.status || "available"}
+                      {row.status}
                     </td>
                     <td className="px-3 py-2 border-b truncate max-w-[200px]">
                       {row.description || "-"}
@@ -294,12 +343,17 @@ export function CsvUpload({ subnets }: CsvUploadProps) {
 
       <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg text-sm">
         <p className="font-medium mb-2">CSV 파일 형식:</p>
-        <code className="text-xs">
+        <p className="text-xs text-muted-foreground mb-2">형식 1: 간단한 형식 (IP,설명)</p>
+        <code className="text-xs block mb-3 bg-gray-100 dark:bg-gray-900 p-2 rounded">
+          10.161.48.11,웹서버
+          <br />
+          10.161.48.12,DB서버
+        </code>
+        <p className="text-xs text-muted-foreground mb-2">형식 2: 상세 형식</p>
+        <code className="text-xs block bg-gray-100 dark:bg-gray-900 p-2 rounded">
           ip_address,status,description,allocated_to
           <br />
-          192.168.1.100,available,웹서버,
-          <br />
-          192.168.1.101,allocated,DB서버,database-01
+          10.161.48.100,allocated,웹서버,server-01
         </code>
       </div>
 
