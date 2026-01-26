@@ -18,9 +18,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Profile } from "@/lib/types/database";
+import { createUser } from "@/app/actions/create-user";
 
 type UserRole = "admin" | "sub_admin" | "user";
 
@@ -35,10 +47,62 @@ interface UserManagementProps {
   currentUserId: string;
 }
 
+type NewUserRole = "sub_admin" | "user";
+
 export function UserManagement({ users, currentUserId }: UserManagementProps) {
   const [isLoading, setIsLoading] = useState<string | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [newUserRole, setNewUserRole] = useState<NewUserRole>("user");
   const router = useRouter();
   const { toast } = useToast();
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsCreating(true);
+
+    try {
+      const result = await createUser({
+        email: newUserEmail,
+        password: newUserPassword,
+        role: newUserRole,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      toast({
+        title: "사용자 추가 완료",
+        description: `${newUserEmail} 사용자가 추가되었습니다.`,
+      });
+
+      setIsDialogOpen(false);
+      setNewUserEmail("");
+      setNewUserPassword("");
+      setNewUserRole("user");
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "사용자 추가 실패",
+        description: error instanceof Error ? error.message : "오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleDialogOpenChange = (open: boolean) => {
+    setIsDialogOpen(open);
+    if (!open) {
+      setNewUserEmail("");
+      setNewUserPassword("");
+      setNewUserRole("user");
+    }
+  };
 
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
     if (userId === currentUserId) {
@@ -81,16 +145,103 @@ export function UserManagement({ users, currentUserId }: UserManagementProps) {
     }
   };
 
+  const addUserDialog = (
+    <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
+      <DialogTrigger asChild>
+        <Button>사용자 추가</Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>새 사용자 추가</DialogTitle>
+          <DialogDescription>
+            새로운 사용자 계정을 생성합니다.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleCreateUser}>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="newUserEmail" className="text-sm font-medium">
+                이메일
+              </label>
+              <Input
+                id="newUserEmail"
+                type="email"
+                placeholder="user@example.com"
+                value={newUserEmail}
+                onChange={(e) => setNewUserEmail(e.target.value)}
+                disabled={isCreating}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="newUserPassword" className="text-sm font-medium">
+                비밀번호
+              </label>
+              <Input
+                id="newUserPassword"
+                type="password"
+                placeholder="최소 6자 이상"
+                value={newUserPassword}
+                onChange={(e) => setNewUserPassword(e.target.value)}
+                disabled={isCreating}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="newUserRole" className="text-sm font-medium">
+                역할
+              </label>
+              <Select
+                value={newUserRole}
+                onValueChange={(value) => setNewUserRole(value as NewUserRole)}
+                disabled={isCreating}
+              >
+                <SelectTrigger id="newUserRole">
+                  <SelectValue placeholder="역할 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sub_admin">부관리자</SelectItem>
+                  <SelectItem value="user">사용자</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleDialogOpenChange(false)}
+              disabled={isCreating}
+            >
+              취소
+            </Button>
+            <Button type="submit" disabled={isCreating}>
+              {isCreating ? "추가 중..." : "추가"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (users.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
-        등록된 사용자가 없습니다.
+      <div className="space-y-4">
+        <div className="flex justify-end">
+          {addUserDialog}
+        </div>
+        <div className="text-center py-8 text-muted-foreground">
+          등록된 사용자가 없습니다.
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        {addUserDialog}
+      </div>
       {/* Desktop View */}
       <div className="hidden md:block">
         <Table>

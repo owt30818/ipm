@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserManagement } from "./user-management";
 import { AuditLogViewer } from "./audit-log-viewer";
+import { ProfileEdit } from "./profile-edit";
 
 async function getCurrentUserProfile() {
   const supabase = await createClient();
@@ -67,29 +68,14 @@ export default async function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>내 프로필</CardTitle>
-              <CardDescription>계정 정보를 확인하세요</CardDescription>
+              <CardDescription>계정 정보를 확인하고 수정하세요</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="text-sm text-muted-foreground">이메일</label>
-                <p className="font-medium">{profile.email}</p>
-              </div>
-              <div>
-                <label className="text-sm text-muted-foreground">역할</label>
-                <p className="font-medium">
-                  {profile.role === "admin"
-                    ? "관리자"
-                    : profile.role === "sub_admin"
-                    ? "부관리자"
-                    : "사용자"}
-                </p>
-              </div>
-              <div>
-                <label className="text-sm text-muted-foreground">가입일</label>
-                <p className="font-medium">
-                  {new Date(profile.created_at).toLocaleDateString("ko-KR")}
-                </p>
-              </div>
+            <CardContent>
+              <ProfileEdit
+                email={profile.email}
+                role={profile.role}
+                createdAt={profile.created_at}
+              />
             </CardContent>
           </Card>
         </TabsContent>
