@@ -54,7 +54,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // 이미 로그인된 사용자가 auth 페이지 접근 시 리다이렉트
-  const authPaths = ["/login", "/signup"];
+  const authPaths = ["/login"];
   const isAuthPath = authPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   );

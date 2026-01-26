@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -121,7 +120,7 @@ export function LoginForm() {
             }}
           />
         </CardContent>
-        <CardFooter className="flex flex-col gap-4">
+        <CardFooter>
           <Button
             type="submit"
             className="w-full"
@@ -129,12 +128,6 @@ export function LoginForm() {
           >
             {isLoading ? "로그인 중..." : "로그인"}
           </Button>
-          <p className="text-sm text-center text-muted-foreground">
-            계정이 없으신가요?{" "}
-            <Link href="/signup" className="text-primary hover:underline">
-              회원가입
-            </Link>
-          </p>
         </CardFooter>
       </form>
     </Card>
