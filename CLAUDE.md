@@ -45,7 +45,13 @@ docker compose up --build                     # Production build
 
 Copy `.env.example` to `.env.local` and configure:
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase project credentials
+- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (for admin user creation)
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` - Cloudflare Turnstile keys
+
+To get `SUPABASE_SERVICE_ROLE_KEY` for local development:
+```bash
+npx supabase status  # Look for "Secret" key
+```
 
 ## Architecture
 
@@ -53,19 +59,25 @@ Copy `.env.example` to `.env.local` and configure:
 
 ```
 app/
-  (auth)/          # Login/signup pages (public)
+  (auth)/          # Login page (public) - signup removed for security
   (main)/          # Protected pages (dashboard, allocate, settings)
-  actions/         # Server Actions (allocate-ips, bulk-update-ips, bulk-delete-ips)
+  actions/         # Server Actions
+    allocate-ips.ts
+    bulk-update-ips.ts
+    bulk-delete-ips.ts
+    create-user.ts       # Admin: create new users
+    update-password.ts   # User: change own password
   api/             # API routes
 components/
-  auth/            # Login/signup forms with Turnstile
-  layout/          # Header, Sidebar, MobileNav
+  auth/            # Login form with Turnstile
+  layout/          # Header (links to settings), Sidebar, MobileNav
   ip/              # IP detail dialog, audit log list
   ui/              # Shadcn/ui primitives
 lib/
   supabase/
     client.ts      # Browser client (use in Client Components)
     server.ts      # Server client (use in Server Components/Actions)
+    admin.ts       # Admin client (use for user management, bypasses RLS)
   types/
     database.ts    # Supabase generated types
 ```
@@ -74,6 +86,9 @@ lib/
 
 - **Server Components / Server Actions:** `import { createClient } from "@/lib/supabase/server"`
 - **Client Components:** `import { createClient } from "@/lib/supabase/client"`
+- **Admin Operations (user creation):** `import { createAdminClient } from "@/lib/supabase/admin"`
+
+> ⚠️ Admin client bypasses RLS. Only use for admin-specific operations like user creation.
 
 ### Server Actions Pattern
 
@@ -107,9 +122,24 @@ Row Level Security (RLS) is enabled. Use `get_my_role()` function for role check
 
 | Route | Purpose |
 |-------|---------|
+| `/login` | Login page with Turnstile protection |
 | `/allocate` | IP allocation forms (subnet selection, quantity input, CSV upload) |
 | `/dashboard` | IP search and status overview with filtering |
-| `/settings` | User management and audit log viewer (admin only) |
+| `/settings` | Profile, user management (admin), audit log viewer |
+
+### User Management (Settings Page)
+
+**Profile Tab (all users):**
+- View account info (email, role, join date)
+- Change password via dialog
+
+**User Management Tab (admin only):**
+- View all users with role badges
+- Add new users (sub_admin/user) via dialog
+- Change user roles via dropdown
+
+**Audit Log Tab (admin/sub_admin):**
+- View system change history
 
 ## UI Patterns
 
@@ -117,3 +147,12 @@ Row Level Security (RLS) is enabled. Use `get_my_role()` function for role check
 - **Data tables:** Desktop uses `<Table>`, mobile uses card-based list
 - **CSV upload:** Drag & drop on desktop, file picker button on mobile
 - **Auth forms:** Include Cloudflare Turnstile widget
+- **Dialogs:** Used for password change and user creation (inline JSX, not function components to avoid re-render issues)
+- **Header:** User email links to `/settings` page
+
+## Security Notes
+
+- **No public signup:** User registration is admin-only to prevent unauthorized access
+- **Service Role Key:** Never expose `SUPABASE_SERVICE_ROLE_KEY` to client-side code
+- **Password requirements:** Minimum 6 characters
+- **Role hierarchy:** admin > sub_admin > user
