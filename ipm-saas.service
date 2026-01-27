@@ -1,0 +1,21 @@
+[Unit]
+Description=IPM SaaS Next.js Application
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=owt30818
+WorkingDirectory=/home/owt30818/IPM
+EnvironmentFile=/home/owt30818/IPM/.env.local
+ExecStart=/home/owt30818/.nvm/versions/node/v20.20.0/bin/node /home/owt30818/IPM/.next/standalone/server.js
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ipm-saas
+
+[Install]
+WantedBy=multi-user.target

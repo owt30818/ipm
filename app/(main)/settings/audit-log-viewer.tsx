@@ -82,7 +82,7 @@ export function AuditLogViewer() {
                   )}
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {new Date(log.created_at).toLocaleString("ko-KR")}
+                  {log.created_at ? new Date(log.created_at).toLocaleString("ko-KR") : "-"}
                 </span>
               </div>
               <div className="text-sm text-muted-foreground">

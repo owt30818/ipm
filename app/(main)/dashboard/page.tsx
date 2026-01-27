@@ -5,6 +5,7 @@ import { IpAddressTable } from "./ip-address-table";
 import { IpAddressList } from "./ip-address-list";
 import { PaginationControl } from "@/components/pagination-control";
 import { SearchFilters } from "./search-filters";
+import { ExportButton } from "./export-button";
 
 async function getStats() {
   const supabase = await createClient();
@@ -188,8 +189,9 @@ export default async function DashboardPage({
 
       {/* IP Address List */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle>IP 주소 목록</CardTitle>
+          <ExportButton />
         </CardHeader>
         <CardContent className="space-y-4">
           <Suspense fallback={<div>로딩 중...</div>}>

@@ -18,7 +18,7 @@ import { updatePassword } from "@/app/actions/update-password";
 interface ProfileEditProps {
   email: string;
   role: string;
-  createdAt: string;
+  createdAt: string | null;
 }
 
 export function ProfileEdit({ email, role, createdAt }: ProfileEditProps) {
@@ -102,7 +102,7 @@ export function ProfileEdit({ email, role, createdAt }: ProfileEditProps) {
       <div>
         <label className="text-sm text-muted-foreground">가입일</label>
         <p className="font-medium">
-          {new Date(createdAt).toLocaleDateString("ko-KR")}
+          {createdAt ? new Date(createdAt).toLocaleDateString("ko-KR") : "-"}
         </p>
       </div>
 
