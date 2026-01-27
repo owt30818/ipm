@@ -5,8 +5,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserManagement } from "./user-management";
 import { AuditLogViewer } from "./audit-log-viewer";
 import { ProfileEdit } from "./profile-edit";
+import { Profile } from "@/lib/types/database";
 
-async function getCurrentUserProfile() {
+async function getCurrentUserProfile(): Promise<Profile | null> {
   const supabase = await createClient();
   const {
     data: { user },

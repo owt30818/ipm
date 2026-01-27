@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import {
   Table,
   TableBody,
@@ -117,15 +116,15 @@ export function UserManagement({ users, currentUserId }: UserManagementProps) {
     setIsLoading(userId);
 
     try {
-      const supabase = createClient();
+      const response = await fetch(`/api/users/${userId}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: newRole }),
+      });
 
-      const { error } = await supabase
-        .from("profiles")
-        .update({ role: newRole })
-        .eq("id", userId);
-
-      if (error) {
-        throw new Error(error.message);
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "역할 변경에 실패했습니다.");
       }
 
       toast({
@@ -270,7 +269,7 @@ export function UserManagement({ users, currentUserId }: UserManagementProps) {
                     <Badge className={roleConfig.className}>{roleConfig.label}</Badge>
                   </TableCell>
                   <TableCell>
-                    {new Date(user.created_at).toLocaleDateString("ko-KR")}
+                    {user.created_at ? new Date(user.created_at).toLocaleDateString("ko-KR") : "-"}
                   </TableCell>
                   <TableCell>
                     <Select
@@ -314,7 +313,7 @@ export function UserManagement({ users, currentUserId }: UserManagementProps) {
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(user.created_at).toLocaleDateString("ko-KR")}
+                    {user.created_at ? new Date(user.created_at).toLocaleDateString("ko-KR") : "-"}
                   </p>
                 </div>
                 <Badge className={roleConfig.className}>{roleConfig.label}</Badge>

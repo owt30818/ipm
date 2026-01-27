@@ -20,12 +20,13 @@ export async function allocateIps(
     }
 
     try {
-        const { data, error } = await supabase.rpc("allocate_contiguous_ips", {
-            p_subnet_id: subnetId,
-            p_quantity: quantity,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data, error } = await (supabase.rpc as any)("allocate_contiguous_ips", {
             p_description: description,
+            p_quantity: quantity,
+            p_subnet_id: subnetId,
             p_user_id: user.id,
-        } as any);
+        });
 
         if (error) {
             console.error("Allocation error:", error);
