@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  allowedDevOrigins: [
+    "http://ypipm.taektech.com",
+    "https://ypipm.taektech.com",
+  ],
   experimental: {
     serverActions: {
       bodySizeLimit: "2mb",

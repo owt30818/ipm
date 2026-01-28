@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,10 +25,12 @@ interface SearchFiltersProps {
 export function SearchFilters({ subnets }: SearchFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
 
   const status = searchParams.get("status") || "";
   const subnetId = searchParams.get("subnet") || "";
   const description = searchParams.get("description") || "";
+  const ipAddress = searchParams.get("ip") || "";
 
   const updateFilters = useCallback(
     (key: string, value: string) => {
@@ -40,20 +42,20 @@ export function SearchFilters({ subnets }: SearchFiltersProps) {
       }
       // 필터 변경 시 페이지를 1로 리셋
       params.delete("page");
-      router.push(`/dashboard?${params.toString()}`);
+      router.push(`${pathname}?${params.toString()}`);
     },
     [router, searchParams]
   );
 
   const clearFilters = useCallback(() => {
-    router.push("/dashboard");
-  }, [router]);
+    router.push(pathname);
+  }, [router, pathname]);
 
-  const hasFilters = status || subnetId || description;
+  const hasFilters = status || subnetId || description || ipAddress;
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {/* 상태 필터 */}
         <div className="space-y-2">
           <label className="text-sm font-medium">상태</label>
@@ -107,6 +109,24 @@ export function SearchFilters({ subnets }: SearchFiltersProps) {
           </form>
         </div>
 
+        {/* IP 주소 검색 */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">IP 주소</label>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              updateFilters("ip", formData.get("ip") as string);
+            }}
+          >
+            <Input
+              name="ip"
+              placeholder="예: 192.168.1"
+              defaultValue={ipAddress}
+            />
+          </form>
+        </div>
+
         {/* 초기화 버튼 */}
         <div className="space-y-2">
           <label className="text-sm font-medium">&nbsp;</label>
@@ -131,6 +151,7 @@ export function SearchFilters({ subnets }: SearchFiltersProps) {
             </span>
           )}
           {description && <span className="ml-2 px-2 py-1 bg-yellow-100 dark:bg-yellow-900 rounded">설명: {description}</span>}
+          {ipAddress && <span className="ml-2 px-2 py-1 bg-purple-100 dark:bg-purple-900 rounded">IP: {ipAddress}</span>}
         </div>
       )}
     </div>

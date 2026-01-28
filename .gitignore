@@ -46,6 +46,5 @@ next-env.d.ts
 # Docker volumes
 postgres_data/
 
-
 # IPM SaaS 기술 문서
 TECHNICAL_DOCS.md

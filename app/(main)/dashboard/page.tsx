@@ -1,130 +1,104 @@
-import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IpAddressTable } from "./ip-address-table";
-import { IpAddressList } from "./ip-address-list";
-import { PaginationControl } from "@/components/pagination-control";
-import { SearchFilters } from "./search-filters";
-import { ExportButton } from "./export-button";
 
-async function getStats() {
-  const supabase = await createClient();
-
-  const { count: totalCount } = await supabase
-    .from("ip_addresses")
-    .select("*", { count: "exact", head: true });
-
-  const { count: availableCount } = await supabase
-    .from("ip_addresses")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "available");
-
-  const { count: allocatedCount } = await supabase
-    .from("ip_addresses")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "allocated");
-
-  const { count: reservedCount } = await supabase
-    .from("ip_addresses")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "reserved");
-
-  return {
-    total: totalCount ?? 0,
-    available: availableCount ?? 0,
-    allocated: allocatedCount ?? 0,
-    reserved: reservedCount ?? 0,
-  };
+interface SubnetStats {
+  id: string;
+  name: string;
+  cidr: string;
+  totalCapacity: number;  // CIDR 기반 전체 IP 수
+  registered: number;     // 등록된 IP 수
+  available: number;      // available 상태
+  allocated: number;      // allocated 상태
+  reserved: number;       // reserved 상태
+  deprecated: number;     // deprecated 상태
+  unregistered: number;   // 미등록 IP 수
 }
 
-async function getSubnets() {
+// CIDR에서 호스트 IP 수 계산 (네트워크/브로드캐스트 포함)
+function calculateIpCount(cidr: string): number {
+  const match = cidr.match(/\/(\d+)$/);
+  if (!match) return 0;
+  const prefix = parseInt(match[1], 10);
+  // /32는 1개, /31은 2개, /30은 4개, ...
+  return Math.pow(2, 32 - prefix);
+}
+
+async function getSubnetStats(): Promise<SubnetStats[]> {
   const supabase = await createClient();
-  const { data } = await supabase
+
+  // 서브넷 목록 가져오기
+  const { data: subnets } = await supabase
     .from("subnets")
     .select("id, name, cidr")
     .order("name");
-  return data ?? [];
+
+  if (!subnets || subnets.length === 0) {
+    return [];
+  }
+
+  // 각 서브넷별 통계 가져오기
+  const statsPromises = subnets.map(async (subnet) => {
+    const totalCapacity = calculateIpCount(subnet.cidr);
+
+    const [registeredResult, availableResult, allocatedResult, reservedResult, deprecatedResult] = await Promise.all([
+      supabase
+        .from("ip_addresses")
+        .select("*", { count: "exact", head: true })
+        .eq("subnet_id", subnet.id),
+      supabase
+        .from("ip_addresses")
+        .select("*", { count: "exact", head: true })
+        .eq("subnet_id", subnet.id)
+        .eq("status", "available"),
+      supabase
+        .from("ip_addresses")
+        .select("*", { count: "exact", head: true })
+        .eq("subnet_id", subnet.id)
+        .eq("status", "allocated"),
+      supabase
+        .from("ip_addresses")
+        .select("*", { count: "exact", head: true })
+        .eq("subnet_id", subnet.id)
+        .eq("status", "reserved"),
+      supabase
+        .from("ip_addresses")
+        .select("*", { count: "exact", head: true })
+        .eq("subnet_id", subnet.id)
+        .eq("status", "deprecated"),
+    ]);
+
+    const registered = registeredResult.count ?? 0;
+
+    return {
+      id: subnet.id,
+      name: subnet.name,
+      cidr: subnet.cidr,
+      totalCapacity,
+      registered,
+      available: availableResult.count ?? 0,
+      allocated: allocatedResult.count ?? 0,
+      reserved: reservedResult.count ?? 0,
+      deprecated: deprecatedResult.count ?? 0,
+      unregistered: totalCapacity - registered,
+    };
+  });
+
+  return Promise.all(statsPromises);
 }
 
-interface FilterParams {
-  status?: string;
-  subnetId?: string;
-  description?: string;
-  page?: number;
-  limit?: number;
-}
+export default async function DashboardPage() {
+  const subnetStats = await getSubnetStats();
 
-async function getIpAddresses(filters: FilterParams) {
-  const { status, subnetId, description, page = 1, limit = 50 } = filters;
-  const supabase = await createClient();
-
-  let query = supabase
-    .from("ip_addresses")
-    .select(
-      `
-      *,
-      subnet:subnets(id, cidr, name)
-    `,
-      { count: "exact" }
-    )
-    .order("ip_address", { ascending: true });
-
-  // 상태 필터
-  if (status) {
-    query = query.eq("status", status);
-  }
-
-  // 서브넷 필터
-  if (subnetId) {
-    query = query.eq("subnet_id", subnetId);
-  }
-
-  // 설명/할당대상 검색 (텍스트 필드만)
-  if (description) {
-    query = query.or(
-      `description.ilike.%${description}%,allocated_to.ilike.%${description}%`
-    );
-  }
-
-  // Pagination
-  const from = (page - 1) * limit;
-  const to = from + limit - 1;
-
-  query = query.range(from, to);
-
-  const { data, error, count } = await query;
-
-  if (error) {
-    console.error("Error fetching IP addresses:", error);
-    return { data: [], count: 0 };
-  }
-
-  return { data: data ?? [], count: count ?? 0 };
-}
-
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{
-    status?: string;
-    subnet?: string;
-    description?: string;
-    page?: string;
-    limit?: string
-  }>;
-}) {
-  const resolvedSearchParams = await searchParams;
-  const status = resolvedSearchParams.status;
-  const subnetId = resolvedSearchParams.subnet;
-  const description = resolvedSearchParams.description;
-  const page = Number(resolvedSearchParams.page) || 1;
-  const limit = Number(resolvedSearchParams.limit) || 50;
-
-  const [stats, subnets, { data: ipAddresses, count }] = await Promise.all([
-    getStats(),
-    getSubnets(),
-    getIpAddresses({ status, subnetId, description, page, limit }),
-  ]);
+  // 전체 합계 계산
+  const totals = subnetStats.reduce(
+    (acc, s) => ({
+      total: acc.total + s.totalCapacity,
+      available: acc.available + s.available,
+      allocated: acc.allocated + s.allocated,
+      reserved: acc.reserved + s.reserved,
+    }),
+    { total: 0, available: 0, allocated: 0, reserved: 0 }
+  );
 
   return (
     <div className="space-y-6">
@@ -133,7 +107,7 @@ export default async function DashboardPage({
         <p className="text-muted-foreground">IP 주소 현황을 확인하세요</p>
       </div>
 
-      {/* Stats Cards */}
+      {/* 전체 통계 요약 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -142,7 +116,7 @@ export default async function DashboardPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{stats.total}</p>
+            <p className="text-2xl font-bold">{totals.total}</p>
           </CardContent>
         </Card>
         <Card>
@@ -152,7 +126,7 @@ export default async function DashboardPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-600">{stats.available}</p>
+            <p className="text-2xl font-bold text-green-600">{totals.available}</p>
           </CardContent>
         </Card>
         <Card>
@@ -162,7 +136,7 @@ export default async function DashboardPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-blue-600">{stats.allocated}</p>
+            <p className="text-2xl font-bold text-blue-600">{totals.allocated}</p>
           </CardContent>
         </Card>
         <Card>
@@ -172,46 +146,93 @@ export default async function DashboardPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-yellow-600">{stats.reserved}</p>
+            <p className="text-2xl font-bold text-yellow-600">{totals.reserved}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Search Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>IP 주소 검색</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <SearchFilters subnets={subnets} />
-        </CardContent>
-      </Card>
-
-      {/* IP Address List */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle>IP 주소 목록</CardTitle>
-          <ExportButton />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Suspense fallback={<div>로딩 중...</div>}>
-            {/* Desktop: Table */}
-            <div className="hidden md:block">
-              <IpAddressTable ipAddresses={ipAddresses} />
+      {/* 서브넷별 상세 통계 */}
+      {subnetStats.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>서브넷별 현황</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-2 font-medium">서브넷</th>
+                    <th className="text-right py-3 px-2 font-medium">전체</th>
+                    <th className="text-right py-3 px-2 font-medium">
+                      <span className="text-green-600">사용 가능</span>
+                    </th>
+                    <th className="text-right py-3 px-2 font-medium">
+                      <span className="text-blue-600">할당됨</span>
+                    </th>
+                    <th className="text-right py-3 px-2 font-medium">
+                      <span className="text-yellow-600">예약됨</span>
+                    </th>
+                    <th className="text-right py-3 px-2 font-medium">사용률</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {subnetStats.map((subnet) => {
+                    const usageRate = subnet.totalCapacity > 0
+                      ? Math.round(((subnet.allocated + subnet.reserved) / subnet.totalCapacity) * 100)
+                      : 0;
+                    return (
+                      <tr key={subnet.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <td className="py-3 px-2">
+                          <div>
+                            <p className="font-medium">{subnet.name}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{subnet.cidr}</p>
+                          </div>
+                        </td>
+                        <td className="text-right py-3 px-2 font-mono">{subnet.totalCapacity}</td>
+                        <td className="text-right py-3 px-2 font-mono text-green-600">{subnet.available}</td>
+                        <td className="text-right py-3 px-2 font-mono text-blue-600">{subnet.allocated}</td>
+                        <td className="text-right py-3 px-2 font-mono text-yellow-600">{subnet.reserved}</td>
+                        <td className="text-right py-3 px-2">
+                          <div className="flex items-center justify-end gap-2">
+                            <div className="w-16 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${usageRate >= 90 ? "bg-red-500" :
+                                    usageRate >= 70 ? "bg-yellow-500" :
+                                      "bg-green-500"
+                                  }`}
+                                style={{ width: `${usageRate}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium w-10 text-right">{usageRate}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-gray-50 dark:bg-gray-800 font-medium">
+                    <td className="py-3 px-2">합계</td>
+                    <td className="text-right py-3 px-2 font-mono">{totals.total}</td>
+                    <td className="text-right py-3 px-2 font-mono text-green-600">{totals.available}</td>
+                    <td className="text-right py-3 px-2 font-mono text-blue-600">{totals.allocated}</td>
+                    <td className="text-right py-3 px-2 font-mono text-yellow-600">{totals.reserved}</td>
+                    <td className="text-right py-3 px-2">
+                      <span className="text-xs font-medium">
+                        {totals.total > 0
+                          ? Math.round(((totals.allocated + totals.reserved) / totals.total) * 100)
+                          : 0}%
+                      </span>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
-            {/* Mobile: Card List */}
-            <div className="block md:hidden">
-              <IpAddressList ipAddresses={ipAddresses} />
-            </div>
-          </Suspense>
-
-          <PaginationControl
-            total={count}
-            page={page}
-            limit={limit}
-          />
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
+

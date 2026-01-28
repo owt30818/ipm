@@ -51,7 +51,8 @@
       "Bash(git -C /home/owt30818/IPM add:*)",
       "Bash(git -C /home/owt30818/IPM commit -m \"$\\(cat <<''EOF''\nAdd user account management features\n\n- Add password change functionality in profile settings\n- Add user creation feature for admins \\(sub_admin/user roles\\)\n- Create Supabase admin client for user management\n- Link header email to settings page\n- Update .env.example with SUPABASE_SERVICE_ROLE_KEY\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git -C /home/owt30818/IPM commit -m \"$\\(cat <<''EOF''\nUpdate CLAUDE.md with user management documentation\n\n- Document new user management features\n- Add admin client usage guidelines\n- Update folder structure with new files\n- Add security notes section\n- Remove signup references \\(feature removed\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(nginx:*)"
+      "Bash(nginx:*)",
+      "Bash(netstat:*)"
     ]
   }
 }
