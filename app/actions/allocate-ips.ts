@@ -6,7 +6,9 @@ import { revalidatePath } from "next/cache";
 export async function allocateIps(
     subnetId: string,
     quantity: number,
-    description: string
+    description: string,
+    status: string = "allocated",
+    allocatedTo: string = ""
 ) {
     const supabase = await createClient();
 
@@ -26,6 +28,8 @@ export async function allocateIps(
             p_quantity: quantity,
             p_subnet_id: subnetId,
             p_user_id: user.id,
+            p_status: status,
+            p_allocated_to: allocatedTo || null
         });
 
         if (error) {

@@ -35,6 +35,16 @@ export function AllocateForm({ subnets }: AllocateFormProps) {
   const [allocatedTo, setAllocatedTo] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingIp, setIsFetchingIp] = useState(false);
+
+  // 새로 추가된 상태: 자동 할당 결과 목록과 설정한 메타데이터들
+  const [allocatedResult, setAllocatedResult] = useState<{
+    ips: { id: string; ip_address: string }[];
+    status: IpStatus;
+    allocatedTo: string;
+    description: string;
+    subnetName: string;
+  } | null>(null);
+
   const router = useRouter();
   const { toast } = useToast();
 
@@ -88,15 +98,25 @@ export function AllocateForm({ subnets }: AllocateFormProps) {
 
     try {
       if (allocationMode === "auto") {
-        const result = await allocateIps(subnetId, quantity, description);
+        const result = await allocateIps(subnetId, quantity, description, status, allocatedTo);
         if (result.error) {
           throw new Error(result.error);
         }
 
-        const allocatedCount = result.data?.length || 0;
+        const subnetName = subnets.find(s => s.id === subnetId)?.name || '알 수 없는 서브넷';
+
+        // 팝업 알림 간소화 및 상태 업데이트
+        setAllocatedResult({
+          ips: result.data || [],
+          status,
+          allocatedTo,
+          description,
+          subnetName
+        });
+
         toast({
           title: "자동 할당 완료",
-          description: `${allocatedCount}개의 IP가 할당되었습니다.`,
+          description: `${result.data?.length || 0}개의 IP가 성공적으로 할당되었습니다. 결과는 하단을 확인해주세요.`,
         });
       } else {
         const supabase = createClient();
@@ -198,49 +218,21 @@ export function AllocateForm({ subnets }: AllocateFormProps) {
       </div>
 
       {allocationMode === "single" ? (
-        <>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">IP 주소</label>
-            <Input
-              type="text"
-              placeholder={isFetchingIp ? "다음 가용 IP 조회 중..." : "192.168.1.100"}
-              value={ipAddress}
-              onChange={(e) => setIpAddress(e.target.value)}
-              pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
-              title="올바른 IPv4 주소를 입력하세요"
-              disabled={isLoading || isFetchingIp}
-            />
-            <p className="text-xs text-muted-foreground">
-              서브넷 선택 시 다음 가용 IP가 자동으로 채워집니다.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">상태</label>
-            <Select value={status} onValueChange={(value) => setStatus(value as IpStatus)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="available">사용 가능</SelectItem>
-                <SelectItem value="allocated">할당됨</SelectItem>
-                <SelectItem value="reserved">예약됨</SelectItem>
-                <SelectItem value="deprecated">사용 안 함</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">할당 대상</label>
-            <Input
-              type="text"
-              placeholder="서버명, 사용자 등"
-              value={allocatedTo}
-              onChange={(e) => setAllocatedTo(e.target.value)}
-              disabled={isLoading}
-            />
-          </div>
-        </>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">IP 주소</label>
+          <Input
+            type="text"
+            placeholder={isFetchingIp ? "다음 가용 IP 조회 중..." : "192.168.1.100"}
+            value={ipAddress}
+            onChange={(e) => setIpAddress(e.target.value)}
+            pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+            title="올바른 IPv4 주소를 입력하세요"
+            disabled={isLoading || isFetchingIp}
+          />
+          <p className="text-xs text-muted-foreground">
+            서브넷 선택 시 다음 가용 IP가 자동으로 채워집니다.
+          </p>
+        </div>
       ) : (
         <div className="space-y-2">
           <label className="text-sm font-medium">요청 수량</label>
@@ -259,6 +251,32 @@ export function AllocateForm({ subnets }: AllocateFormProps) {
       )}
 
       <div className="space-y-2">
+        <label className="text-sm font-medium">상태</label>
+        <Select value={status} onValueChange={(value) => setStatus(value as IpStatus)}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="available">사용 가능</SelectItem>
+            <SelectItem value="allocated">할당됨</SelectItem>
+            <SelectItem value="reserved">예약됨</SelectItem>
+            <SelectItem value="deprecated">사용 안 함</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium">할당 대상</label>
+        <Input
+          type="text"
+          placeholder="서버명, 사용자 등"
+          value={allocatedTo}
+          onChange={(e) => setAllocatedTo(e.target.value)}
+          disabled={isLoading}
+        />
+      </div>
+
+      <div className="space-y-2">
         <label className="text-sm font-medium">설명</label>
         <Textarea
           placeholder="IP 주소에 대한 설명을 입력하세요"
@@ -272,6 +290,60 @@ export function AllocateForm({ subnets }: AllocateFormProps) {
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? "등록 중..." : "IP 주소 등록"}
       </Button>
+
+      {/* 할당 결과 표시 영역 */}
+      {allocatedResult && allocatedResult.ips && allocatedResult.ips.length > 0 && (
+        <div className="mt-8 p-5 border rounded-lg bg-slate-50 dark:bg-slate-900/50 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-border/50">
+            <h3 className="text-sm font-bold text-green-700 dark:text-green-500 flex items-center gap-2">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/50">✓</span>
+              성공적으로 할당된 IP (총 {allocatedResult.ips.length}개)
+            </h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground h-8 text-xs"
+              onClick={() => setAllocatedResult(null)}
+              type="button"
+            >
+              결과 닫기
+            </Button>
+          </div>
+
+          <div className="mb-5 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm bg-background p-4 rounded-md border border-border/50">
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">선택된 서브넷</div>
+              <div className="font-medium text-foreground">{allocatedResult.subnetName}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">상태</div>
+              <div className="font-medium text-foreground">
+                {allocatedResult.status === 'allocated' ? '할당됨' :
+                  allocatedResult.status === 'reserved' ? '예약됨' :
+                    allocatedResult.status === 'deprecated' ? '사용 안 함' : '사용 가능'}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">할당 대상</div>
+              <div className="font-medium text-foreground">{allocatedResult.allocatedTo || <span className="text-muted-foreground italic">없음</span>}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">설명</div>
+              <div className="font-medium text-foreground truncate" title={allocatedResult.description}>{allocatedResult.description || <span className="text-muted-foreground italic">없음</span>}</div>
+            </div>
+          </div>
+
+          <div className="bg-background rounded-md border p-4 max-h-[250px] overflow-y-auto">
+            <div className="flex flex-wrap gap-2">
+              {allocatedResult.ips.map(item => (
+                <span key={item.id} className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 font-mono shadow-sm border border-blue-200 dark:border-blue-800/50 cursor-default hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors">
+                  {item.ip_address}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

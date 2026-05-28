@@ -11,6 +11,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { MoreHorizontal, Trash2, KeyRound } from "lucide-react";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -32,6 +49,8 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Profile } from "@/lib/types/database";
 import { createUser } from "@/app/actions/create-user";
+import { deleteUser } from "@/app/actions/delete-user";
+import { adminUpdatePassword } from "@/app/actions/admin-update-password";
 
 type UserRole = "admin" | "sub_admin" | "user";
 
@@ -52,6 +71,16 @@ export function UserManagement({ users, currentUserId }: UserManagementProps) {
   const [isLoading, setIsLoading] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Password Reset State
+  const [isPasswordResetDialogOpen, setIsPasswordResetDialogOpen] = useState(false);
+  const [resetPassword, setResetPassword] = useState("");
+  const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+
+  // Delete User State
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  // Using selectedUser for delete as well
+
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserPassword, setNewUserPassword] = useState("");
   const [newUserRole, setNewUserRole] = useState<NewUserRole>("user");
@@ -144,6 +173,80 @@ export function UserManagement({ users, currentUserId }: UserManagementProps) {
     }
   };
 
+  const openDeleteDialog = (user: Profile) => {
+    setSelectedUser(user);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+
+    setIsLoading(selectedUser.id);
+
+    try {
+      const result = await deleteUser(selectedUser.id);
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      toast({
+        title: "사용자 삭제 완료",
+        description: `${selectedUser.email} 사용자가 삭제되었습니다.`,
+      });
+
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "사용자 삭제 실패",
+        description: error instanceof Error ? error.message : "오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(null);
+      setIsDeleteDialogOpen(false);
+      setSelectedUser(null);
+    }
+  };
+
+  const openPasswordResetDialog = (user: Profile) => {
+    setSelectedUser(user);
+    setResetPassword("");
+    setIsPasswordResetDialogOpen(true);
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser) return;
+
+    setIsLoading(selectedUser.id);
+
+    try {
+      const result = await adminUpdatePassword(selectedUser.id, resetPassword);
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      toast({
+        title: "비밀번호 변경 완료",
+        description: `${selectedUser.email} 사용자의 비밀번호가 변경되었습니다.`,
+      });
+
+      setIsPasswordResetDialogOpen(false);
+      setResetPassword("");
+      setSelectedUser(null);
+    } catch (error) {
+      toast({
+        title: "비밀번호 변경 실패",
+        description: error instanceof Error ? error.message : "오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(null);
+    }
+  };
+
   const addUserDialog = (
     <Dialog open={isDialogOpen} onOpenChange={handleDialogOpenChange}>
       <DialogTrigger asChild>
@@ -223,6 +326,73 @@ export function UserManagement({ users, currentUserId }: UserManagementProps) {
     </Dialog>
   );
 
+  const passwordResetDialog = (
+    <Dialog open={isPasswordResetDialogOpen} onOpenChange={setIsPasswordResetDialogOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>비밀번호 초기화</DialogTitle>
+          <DialogDescription>
+            {selectedUser?.email} 사용자의 새 비밀번호를 설정합니다.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleResetPassword}>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="resetPassword" className="text-sm font-medium">
+                새 비밀번호
+              </label>
+              <Input
+                id="resetPassword"
+                type="password"
+                placeholder="최소 6자 이상"
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+                disabled={isLoading === selectedUser?.id}
+                required
+                minLength={6}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsPasswordResetDialogOpen(false)}
+              disabled={isLoading === selectedUser?.id}
+            >
+              취소
+            </Button>
+            <Button type="submit" disabled={isLoading === selectedUser?.id}>
+              {isLoading === selectedUser?.id ? "변경 중..." : "변경"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const deleteConfirmDialog = (
+    <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>정말 삭제하시겠습니까?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {selectedUser?.email} 사용자를 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없습니다.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={() => setSelectedUser(null)}>취소</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDeleteUser}
+            className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+          >
+            삭제
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
   if (users.length === 0) {
     return (
       <div className="space-y-4">
@@ -240,6 +410,8 @@ export function UserManagement({ users, currentUserId }: UserManagementProps) {
     <div className="space-y-4">
       <div className="flex justify-end">
         {addUserDialog}
+        {passwordResetDialog}
+        {deleteConfirmDialog}
       </div>
       {/* Desktop View */}
       <div className="hidden md:block">
@@ -250,6 +422,7 @@ export function UserManagement({ users, currentUserId }: UserManagementProps) {
               <TableHead>역할</TableHead>
               <TableHead>가입일</TableHead>
               <TableHead>역할 변경</TableHead>
+              <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -288,6 +461,31 @@ export function UserManagement({ users, currentUserId }: UserManagementProps) {
                         <SelectItem value="user">사용자</SelectItem>
                       </SelectContent>
                     </Select>
+                  </TableCell>
+                  <TableCell>
+                    {!isCurrentUser && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">메뉴 열기</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openPasswordResetDialog(user)}>
+                            <KeyRound className="mr-2 h-4 w-4" />
+                            <span>비밀번호 변경</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => openDeleteDialog(user)}
+                            className="text-red-600 focus:text-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            <span>사용자 삭제</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </TableCell>
                 </TableRow>
               );
@@ -334,6 +532,31 @@ export function UserManagement({ users, currentUserId }: UserManagementProps) {
                   <SelectItem value="user">사용자</SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* Mobile Actions */}
+              {
+                !isCurrentUser && (
+                  <div className="flex justify-end gap-2 pt-2 border-t mt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openPasswordResetDialog(user)}
+                    >
+                      <KeyRound className="mr-2 h-3 w-3" />
+                      암호 변경
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                      onClick={() => openDeleteDialog(user)}
+                    >
+                      <Trash2 className="mr-2 h-3 w-3" />
+                      삭제
+                    </Button>
+                  </div>
+                )
+              }
             </div>
           );
         })}
