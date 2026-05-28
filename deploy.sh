@@ -1,23 +1,31 @@
 #!/bin/bash
 set -e
 
-echo "🛑 Stopping ipm-saas service..."
-sudo systemctl stop ipm-saas || true
+# --- Docker 배포 (새 서버) ---
+if [ "$1" = "docker" ]; then
+  echo "Pulling latest changes..."
+  git pull
 
-echo "🏗️ Building the application..."
-npm run build
+  echo "Building and starting Docker containers..."
+  docker compose down
+  docker compose build --no-cache
+  docker compose up -d
 
-echo "📂 Preparing standalone build..."
-# Copy static assets to standalone directory
-cp -r .next/static .next/standalone/.next/static
-mkdir -p .next/standalone/public
-# If public directory exists, copy it (ignoring error if empty/missing)
-if [ -d "public" ]; then
-    cp -r public/* .next/standalone/public/ || true
+  echo "Container status:"
+  docker compose ps
+  echo "Deployment complete (Docker)"
+  exit 0
 fi
 
-echo "🚀 Starting ipm-saas service..."
+# --- systemd 배포 (레거시, 현재 서버) ---
+echo "Stopping ipm-saas service..."
+sudo systemctl stop ipm-saas || true
+
+echo "Building the application..."
+npm run build
+
+echo "Starting ipm-saas service..."
 sudo systemctl start ipm-saas
 sudo systemctl status ipm-saas --no-pager
 
-echo "✅ Deployment complete!"
+echo "Deployment complete (systemd)"
