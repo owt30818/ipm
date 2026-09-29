@@ -24,7 +24,8 @@ ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=$NEXT_PUBLIC_TURNSTILE_SITE_KEY
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-RUN npm run build
+# public/ is optional in the repo but required by the runner stage COPY
+RUN mkdir -p public && npm run build
 
 # Stage 3: Runner
 FROM node:22-alpine AS runner
