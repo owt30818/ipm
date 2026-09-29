@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { formatDateTimeKst } from "@/lib/utils";
 import { ErrorNotice } from "@/components/ui/error-notice";
+import { CopyIpButton } from "@/components/ip/copy-ip-button";
 import { toKoreanError } from "@/lib/errors";
 import { IpAddressTable } from "../dashboard/ip-address-table";
 import { IpAddressList } from "../dashboard/ip-address-list";
@@ -191,6 +192,7 @@ export default async function IpListPage({
                                 >
                                     <div className="flex items-center gap-3 min-w-0">
                                         <span className="font-mono font-medium">{ip.ip_address}</span>
+                                        <CopyIpButton ip={ip.ip_address} className="-ml-2" />
                                         <Badge variant="secondary" className="truncate">
                                             {ip.subnet?.name ?? "-"}
                                         </Badge>

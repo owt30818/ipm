@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { IpAddressWithSubnet } from "@/lib/types/database";
 import { IpDetailDialog } from "@/components/ip/ip-detail-dialog";
+import { CopyIpButton } from "@/components/ip/copy-ip-button";
 import { deleteIps } from "@/app/actions/bulk-delete-ips";
 import { updateIps } from "@/app/actions/bulk-update-ips";
 import { useToast } from "@/hooks/use-toast";
@@ -242,7 +243,10 @@ export function IpAddressTable({ ipAddresses, canEdit = false, canDelete = false
                       </TableCell>
                     )}
                     <TableCell className="font-mono font-medium">
-                      {ip.ip_address}
+                      <div className="flex items-center gap-1">
+                        <span>{ip.ip_address}</span>
+                        <CopyIpButton ip={ip.ip_address} />
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge className={status.className}>{status.label}</Badge>

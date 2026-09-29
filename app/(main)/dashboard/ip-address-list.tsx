@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { IpAddressWithSubnet, AuditLog } from "@/lib/types/database";
 import { useToast } from "@/hooks/use-toast";
+import { CopyIpButton } from "@/components/ip/copy-ip-button";
 import { toKoreanError } from "@/lib/errors";
 
 type IpStatus = "available" | "allocated" | "reserved" | "deprecated";
@@ -172,7 +173,10 @@ function IpCard({
         <Card className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="font-mono font-medium">{ip.ip_address}</span>
+              <span className="flex items-center gap-1">
+                <span className="font-mono font-medium">{ip.ip_address}</span>
+                <CopyIpButton ip={ip.ip_address} />
+              </span>
               <Badge className={currentStatus.className}>{currentStatus.label}</Badge>
             </div>
             <div className="text-sm text-muted-foreground">
