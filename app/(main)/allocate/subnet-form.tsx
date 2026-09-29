@@ -35,12 +35,14 @@ import {
 import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Subnet, SubnetInsert } from "@/lib/types/database";
+import { toKoreanError } from "@/lib/errors";
 
 interface SubnetFormProps {
   subnets: Subnet[];
+  canDelete?: boolean;
 }
 
-export function SubnetForm({ subnets }: SubnetFormProps) {
+export function SubnetForm({ subnets, canDelete = false }: SubnetFormProps) {
   const [name, setName] = useState("");
   const [cidr, setCidr] = useState("");
   const [description, setDescription] = useState("");
@@ -97,7 +99,7 @@ export function SubnetForm({ subnets }: SubnetFormProps) {
       const { error } = await supabase.from("subnets").insert(insertData as any);
 
       if (error) {
-        throw new Error(error.message);
+        throw new Error(toKoreanError(error));
       }
 
       toast({
@@ -114,7 +116,7 @@ export function SubnetForm({ subnets }: SubnetFormProps) {
       toast({
         title: "등록 실패",
         description:
-          error instanceof Error ? error.message : "오류가 발생했습니다.",
+          toKoreanError(error),
         variant: "destructive",
       });
     } finally {
@@ -144,16 +146,22 @@ export function SubnetForm({ subnets }: SubnetFormProps) {
     try {
       const supabase = createClient();
 
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from("subnets")
         .update({
           name: editName,
           description: editDescription || null,
         })
-        .eq("id", editingSubnet.id);
+        .eq("id", editingSubnet.id)
+        .select("id");
 
       if (error) {
-        throw new Error(error.message);
+        throw new Error(toKoreanError(error));
+      }
+
+      // RLS skips rows the user may not change without raising an error
+      if (!updated || updated.length === 0) {
+        throw new Error("수정할 수 없습니다. 권한을 확인하거나 목록을 새로고침해주세요.");
       }
 
       toast({
@@ -168,7 +176,7 @@ export function SubnetForm({ subnets }: SubnetFormProps) {
       toast({
         title: "수정 실패",
         description:
-          error instanceof Error ? error.message : "오류가 발생했습니다.",
+          toKoreanError(error),
         variant: "destructive",
       });
     } finally {
@@ -189,13 +197,18 @@ export function SubnetForm({ subnets }: SubnetFormProps) {
     try {
       const supabase = createClient();
 
-      const { error } = await supabase
+      const { data: deleted, error } = await supabase
         .from("subnets")
         .delete()
-        .eq("id", deletingSubnet.id);
+        .eq("id", deletingSubnet.id)
+        .select("id");
 
       if (error) {
-        throw new Error(error.message);
+        throw new Error(toKoreanError(error));
+      }
+
+      if (!deleted || deleted.length === 0) {
+        throw new Error("삭제할 수 없습니다. 이미 삭제되었거나 권한이 없습니다.");
       }
 
       toast({
@@ -210,7 +223,7 @@ export function SubnetForm({ subnets }: SubnetFormProps) {
       toast({
         title: "삭제 실패",
         description:
-          error instanceof Error ? error.message : "오류가 발생했습니다.",
+          toKoreanError(error),
         variant: "destructive",
       });
     } finally {
@@ -286,13 +299,15 @@ export function SubnetForm({ subnets }: SubnetFormProps) {
                             <Pencil className="h-4 w-4 mr-2" />
                             수정
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => openDeleteDialog(subnet)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            삭제
-                          </DropdownMenuItem>
+                          {canDelete && (
+                            <DropdownMenuItem
+                              onClick={() => openDeleteDialog(subnet)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              삭제
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

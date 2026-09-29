@@ -128,6 +128,23 @@ RPCs are executable by `authenticated` only (never `anon`). Migrations 009/010 e
 
 Row Level Security (RLS) is enabled. Use `get_my_role()` function for role checks in policies.
 
+### Roles and permissions
+
+Rules live in `lib/roles.ts` and mirror the RLS policies (the database stays the real enforcement):
+
+| Action | admin | sub_admin | user |
+|--------|:-----:|:---------:|:----:|
+| View IPs, subnets, dashboard | ✓ | ✓ | ✓ |
+| Register / edit / allocate IPs, register / edit subnets (`canManage`) | ✓ | ✓ | |
+| Delete IPs and subnets (`canDelete`) | ✓ | | |
+
+- `getSessionProfile()` (`lib/auth/session.ts`) returns the user + role once per request; the main layout passes `role` to Sidebar/Header, pages pass `canEdit`/`canDelete` to the IP list components.
+- Server actions and API routes check the role first and return a Korean message; RLS-filtered writes do not raise errors, so they also verify the affected row count.
+
+### Error messages
+
+Never show `error.message` from Supabase/Postgres directly. Use `toKoreanError(error)` from `lib/errors.ts`; it maps SQLSTATE codes, constraint names, our own SQL exceptions (migrations 009/010), Supabase Auth codes and network failures, and falls back to a generic Korean message. Messages already in Korean pass through unchanged.
+
 ### Responsive Layout
 
 - **Desktop:** Fixed left sidebar (`hidden md:block`)

@@ -1,6 +1,9 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getSessionProfile } from "@/lib/auth/session";
+import { canManage, NO_PERMISSION_MANAGE } from "@/lib/roles";
+import { toKoreanError } from "@/lib/errors";
 import { revalidatePath } from "next/cache";
 
 export async function allocateIps(
@@ -10,16 +13,18 @@ export async function allocateIps(
     status: string = "allocated",
     allocatedTo: string = ""
 ) {
-    const supabase = await createClient();
+    const session = await getSessionProfile();
 
-    // Get current user
-    const {
-        data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-        return { error: "Unauthorized" };
+    if (!session) {
+        return { error: "로그인이 필요합니다. 다시 로그인해주세요." };
     }
+
+    if (!canManage(session.role)) {
+        return { error: NO_PERMISSION_MANAGE };
+    }
+
+    const user = session.user;
+    const supabase = await createClient();
 
     try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,7 +39,7 @@ export async function allocateIps(
 
         if (error) {
             console.error("Allocation error:", error);
-            return { error: error.message };
+            return { error: toKoreanError(error) };
         }
 
         revalidatePath("/dashboard");
@@ -46,6 +51,6 @@ export async function allocateIps(
         };
     } catch (e) {
         console.error("Unexpected error:", e);
-        return { error: "An unexpected error occurred" };
+        return { error: toKoreanError(e) };
     }
 }

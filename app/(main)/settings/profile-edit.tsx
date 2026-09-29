@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { updatePassword } from "@/app/actions/update-password";
+import { toKoreanError } from "@/lib/errors";
 
 interface ProfileEditProps {
   email: string;
@@ -73,7 +74,7 @@ export function ProfileEdit({ email, role, createdAt }: ProfileEditProps) {
       toast({
         title: "비밀번호 변경 실패",
         description:
-          error instanceof Error ? error.message : "오류가 발생했습니다.",
+          toKoreanError(error),
         variant: "destructive",
       });
     } finally {

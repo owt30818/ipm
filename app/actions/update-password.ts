@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { toKoreanError } from "@/lib/errors";
 
 interface UpdatePasswordResult {
   success: boolean;
@@ -29,7 +30,7 @@ export async function updatePassword(
   });
 
   if (error) {
-    return { success: false, error: error.message };
+    return { success: false, error: toKoreanError(error) };
   }
 
   return { success: true };

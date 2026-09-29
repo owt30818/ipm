@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Subnet, IpAddressInsert } from "@/lib/types/database";
+import { toKoreanError } from "@/lib/errors";
 
 interface CsvUploadProps {
   subnets: Subnet[];
@@ -173,7 +174,7 @@ export function CsvUpload({ subnets }: CsvUploadProps) {
       error: (error) => {
         toast({
           title: "파일 파싱 오류",
-          description: error.message,
+          description: "CSV 파일을 읽을 수 없습니다. 파일 형식을 확인해주세요.",
           variant: "destructive",
         });
       },
@@ -265,7 +266,7 @@ export function CsvUpload({ subnets }: CsvUploadProps) {
       const { error } = await supabase.from("ip_addresses").insert(insertData as any);
 
       if (error) {
-        throw new Error(error.message);
+        throw new Error(toKoreanError(error));
       }
 
       toast({
@@ -279,7 +280,7 @@ export function CsvUpload({ subnets }: CsvUploadProps) {
       toast({
         title: "업로드 실패",
         description:
-          error instanceof Error ? error.message : "오류가 발생했습니다.",
+          toKoreanError(error),
         variant: "destructive",
       });
     } finally {

@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { allocateIps } from "@/app/actions/allocate-ips";
 import { getNextAvailableIp } from "@/app/actions/get-next-available-ip";
 import { Subnet, IpAddressInsert } from "@/lib/types/database";
+import { toKoreanError } from "@/lib/errors";
 
 interface AllocateFormProps {
   subnets: Subnet[];
@@ -143,7 +144,7 @@ export function AllocateForm({ subnets }: AllocateFormProps) {
         const { error } = await supabase.from("ip_addresses").insert(insertData as any);
 
         if (error) {
-          throw new Error(error.message);
+          throw new Error(toKoreanError(error));
         }
 
         toast({
@@ -176,7 +177,7 @@ export function AllocateForm({ subnets }: AllocateFormProps) {
       toast({
         title: "등록 실패",
         description:
-          error instanceof Error ? error.message : "오류가 발생했습니다.",
+          toKoreanError(error),
         variant: "destructive",
       });
     } finally {

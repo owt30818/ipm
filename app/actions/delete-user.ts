@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { toKoreanError } from "@/lib/errors";
 
 interface DeleteUserResult {
   success: boolean;
@@ -42,7 +43,7 @@ export async function deleteUser(userId: string): Promise<DeleteUserResult> {
 
   if (deleteError) {
     console.error("Failed to delete user:", deleteError);
-    return { success: false, error: deleteError.message };
+    return { success: false, error: toKoreanError(deleteError) };
   }
 
   return { success: true };

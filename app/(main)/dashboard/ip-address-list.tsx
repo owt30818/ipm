@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { IpAddressWithSubnet, AuditLog } from "@/lib/types/database";
 import { useToast } from "@/hooks/use-toast";
+import { toKoreanError } from "@/lib/errors";
 
 type IpStatus = "available" | "allocated" | "reserved" | "deprecated";
 
@@ -47,9 +48,11 @@ const statusConfig = {
 
 interface IpAddressListProps {
   ipAddresses: IpAddressWithSubnet[];
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
-export function IpAddressList({ ipAddresses }: IpAddressListProps) {
+export function IpAddressList({ ipAddresses, canEdit = false, canDelete = false }: IpAddressListProps) {
   if (ipAddresses.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -61,13 +64,21 @@ export function IpAddressList({ ipAddresses }: IpAddressListProps) {
   return (
     <div className="space-y-3">
       {ipAddresses.map((ip) => (
-        <IpCard key={ip.id} ip={ip} />
+        <IpCard key={ip.id} ip={ip} canEdit={canEdit} canDelete={canDelete} />
       ))}
     </div>
   );
 }
 
-function IpCard({ ip }: { ip: IpAddressWithSubnet }) {
+function IpCard({
+  ip,
+  canEdit,
+  canDelete,
+}: {
+  ip: IpAddressWithSubnet;
+  canEdit: boolean;
+  canDelete: boolean;
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const [status, setStatus] = useState<IpStatus>(ip.status);
   const [description, setDescription] = useState(ip.description || "");
@@ -117,7 +128,7 @@ function IpCard({ ip }: { ip: IpAddressWithSubnet }) {
     } catch (error) {
       toast({
         title: "수정 실패",
-        description: error instanceof Error ? error.message : "오류가 발생했습니다.",
+        description: toKoreanError(error),
         variant: "destructive",
       });
     } finally {
@@ -147,7 +158,7 @@ function IpCard({ ip }: { ip: IpAddressWithSubnet }) {
     } catch (error) {
       toast({
         title: "삭제 실패",
-        description: error instanceof Error ? error.message : "오류가 발생했습니다.",
+        description: toKoreanError(error),
         variant: "destructive",
       });
     } finally {
@@ -246,6 +257,7 @@ function IpCard({ ip }: { ip: IpAddressWithSubnet }) {
             </>
           )}
         </div>
+        {(canEdit || canDelete) && (
         <DrawerFooter>
           {isEditing ? (
             <div className="flex gap-2 w-full">
@@ -263,6 +275,7 @@ function IpCard({ ip }: { ip: IpAddressWithSubnet }) {
             </div>
           ) : (
             <div className="flex gap-2 w-full">
+              {canDelete && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" className="flex-1" disabled={isLoading}>
@@ -282,12 +295,16 @@ function IpCard({ ip }: { ip: IpAddressWithSubnet }) {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-              <Button className="flex-1" onClick={() => setIsEditing(true)}>
-                수정
-              </Button>
+              )}
+              {canEdit && (
+                <Button className="flex-1" onClick={() => setIsEditing(true)}>
+                  수정
+                </Button>
+              )}
             </div>
           )}
         </DrawerFooter>
+        )}
       </DrawerContent>
     </Drawer>
   );

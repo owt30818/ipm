@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { toKoreanError } from "@/lib/errors";
 
 interface AdminUpdatePasswordResult {
     success: boolean;
@@ -48,7 +49,7 @@ export async function adminUpdatePassword(
 
     if (updateError) {
         console.error("Failed to update user password:", updateError);
-        return { success: false, error: updateError.message };
+        return { success: false, error: toKoreanError(updateError) };
     }
 
     return { success: true };

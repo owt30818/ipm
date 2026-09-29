@@ -1,4 +1,7 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getSessionProfile } from "@/lib/auth/session";
+import { canDelete, canManage } from "@/lib/roles";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AllocateForm } from "./allocate-form";
@@ -21,6 +24,30 @@ async function getSubnets() {
 }
 
 export default async function AllocatePage() {
+  const session = await getSessionProfile();
+
+  if (!session) {
+    redirect("/login");
+  }
+
+  if (!canManage(session.role)) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">IP 할당</h1>
+          <p className="text-muted-foreground">IP 주소를 할당하고 관리하세요</p>
+        </div>
+        <Card>
+          <CardContent className="py-10 text-center text-muted-foreground">
+            IP 할당은 관리자 또는 부관리자만 사용할 수 있습니다.
+            <br />
+            권한이 필요하면 관리자에게 문의하세요.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const subnets = await getSubnets();
 
   return (
@@ -74,7 +101,7 @@ export default async function AllocatePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <SubnetForm subnets={subnets} />
+              <SubnetForm subnets={subnets} canDelete={canDelete(session.role)} />
             </CardContent>
           </Card>
         </TabsContent>

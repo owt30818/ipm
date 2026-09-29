@@ -36,6 +36,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { IpAddressWithSubnet, AuditLog } from "@/lib/types/database";
 import { AuditLogList } from "./audit-log-list";
+import { toKoreanError } from "@/lib/errors";
 
 type IpStatus = "available" | "allocated" | "reserved" | "deprecated";
 
@@ -50,9 +51,17 @@ interface IpDetailDialogProps {
   ip: IpAddressWithSubnet | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
-export function IpDetailDialog({ ip, open, onOpenChange }: IpDetailDialogProps) {
+export function IpDetailDialog({
+  ip,
+  open,
+  onOpenChange,
+  canEdit = false,
+  canDelete = false,
+}: IpDetailDialogProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [status, setStatus] = useState<IpStatus>("available");
   const [description, setDescription] = useState("");
@@ -114,7 +123,7 @@ export function IpDetailDialog({ ip, open, onOpenChange }: IpDetailDialogProps) 
     } catch (error) {
       toast({
         title: "수정 실패",
-        description: error instanceof Error ? error.message : "오류가 발생했습니다.",
+        description: toKoreanError(error),
         variant: "destructive",
       });
     } finally {
@@ -146,7 +155,7 @@ export function IpDetailDialog({ ip, open, onOpenChange }: IpDetailDialogProps) 
     } catch (error) {
       toast({
         title: "삭제 실패",
-        description: error instanceof Error ? error.message : "오류가 발생했습니다.",
+        description: toKoreanError(error),
         variant: "destructive",
       });
     } finally {
@@ -253,6 +262,7 @@ export function IpDetailDialog({ ip, open, onOpenChange }: IpDetailDialogProps) 
           </TabsContent>
         </Tabs>
 
+        {(canEdit || canDelete) && (
         <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
           {isEditing ? (
             <>
@@ -269,6 +279,7 @@ export function IpDetailDialog({ ip, open, onOpenChange }: IpDetailDialogProps) 
             </>
           ) : (
             <>
+              {canDelete && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" disabled={isLoading}>
@@ -288,10 +299,12 @@ export function IpDetailDialog({ ip, open, onOpenChange }: IpDetailDialogProps) 
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-              <Button onClick={() => setIsEditing(true)}>수정</Button>
+              )}
+              {canEdit && <Button onClick={() => setIsEditing(true)}>수정</Button>}
             </>
           )}
         </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

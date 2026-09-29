@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getSessionProfile } from "@/lib/auth/session";
+import { canDelete, canManage, NO_PERMISSION_DELETE, NO_PERMISSION_MANAGE } from "@/lib/roles";
+import { toKoreanError } from "@/lib/errors";
+
+const STATUSES = ["available", "allocated", "reserved", "deprecated"];
+
+// Audit rows are written by the ip_addresses trigger (migration 010), not here.
 
 export async function GET(
   request: NextRequest,
@@ -21,15 +28,12 @@ export async function GET(
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 404 });
+      return NextResponse.json({ error: toKoreanError(error) }, { status: 404 });
     }
 
     return NextResponse.json(data);
   } catch (error) {
-    return NextResponse.json(
-      { error: "서버 오류가 발생했습니다." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: toKoreanError(error) }, { status: 500 });
   }
 }
 
@@ -39,29 +43,24 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const session = await getSessionProfile();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session) {
       return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+    }
+
+    if (!canManage(session.role)) {
+      return NextResponse.json({ error: NO_PERMISSION_MANAGE }, { status: 403 });
     }
 
     const body = await request.json();
     const { status, description, allocated_to } = body;
 
-    // 존재 여부 확인 (감사 로그는 DB 트리거가 기록)
-    const { error: fetchError } = await supabase
-      .from("ip_addresses")
-      .select("id")
-      .eq("id", id)
-      .single();
-
-    if (fetchError) {
-      return NextResponse.json({ error: "IP를 찾을 수 없습니다." }, { status: 404 });
+    if (status !== undefined && !STATUSES.includes(status)) {
+      return NextResponse.json({ error: "올바르지 않은 상태 값입니다." }, { status: 400 });
     }
+
+    const supabase = await createClient();
 
     // 업데이트 데이터 구성
     const updateData: Record<string, unknown> = {};
@@ -82,18 +81,19 @@ export async function PATCH(
       .update(updateData)
       .eq("id", id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 400 });
+      return NextResponse.json({ error: toKoreanError(updateError) }, { status: 400 });
+    }
+
+    if (!newData) {
+      return NextResponse.json({ error: "IP를 찾을 수 없습니다." }, { status: 404 });
     }
 
     return NextResponse.json(newData);
   } catch (error) {
-    return NextResponse.json(
-      { error: "서버 오류가 발생했습니다." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: toKoreanError(error) }, { status: 500 });
   }
 }
 
@@ -103,42 +103,35 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const session = await getSessionProfile();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    if (!session) {
       return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
     }
 
-    // 존재 여부 확인 (감사 로그는 DB 트리거가 기록)
-    const { error: fetchError } = await supabase
-      .from("ip_addresses")
-      .select("id")
-      .eq("id", id)
-      .single();
-
-    if (fetchError) {
-      return NextResponse.json({ error: "IP를 찾을 수 없습니다." }, { status: 404 });
+    if (!canDelete(session.role)) {
+      return NextResponse.json({ error: NO_PERMISSION_DELETE }, { status: 403 });
     }
 
+    const supabase = await createClient();
+
     // IP 삭제
-    const { error: deleteError } = await supabase
+    const { data: deleted, error: deleteError } = await supabase
       .from("ip_addresses")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .select("id");
 
     if (deleteError) {
-      return NextResponse.json({ error: deleteError.message }, { status: 400 });
+      return NextResponse.json({ error: toKoreanError(deleteError) }, { status: 400 });
+    }
+
+    if (!deleted || deleted.length === 0) {
+      return NextResponse.json({ error: "IP를 찾을 수 없습니다." }, { status: 404 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json(
-      { error: "서버 오류가 발생했습니다." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: toKoreanError(error) }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { toKoreanError } from "@/lib/errors";
 
 type UserRole = "sub_admin" | "user";
 
@@ -56,10 +57,7 @@ export async function createUser(input: CreateUserInput): Promise<CreateUserResu
   });
 
   if (createError) {
-    if (createError.message.includes("already been registered")) {
-      return { success: false, error: "이미 등록된 이메일입니다." };
-    }
-    return { success: false, error: createError.message };
+    return { success: false, error: toKoreanError(createError) };
   }
 
   if (!newUser.user) {

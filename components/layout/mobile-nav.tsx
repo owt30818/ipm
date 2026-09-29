@@ -4,8 +4,9 @@ import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Sidebar } from "./sidebar";
+import type { UserRole } from "@/lib/roles";
 
-export function MobileNav() {
+export function MobileNav({ role }: { role?: UserRole }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -29,7 +30,7 @@ export function MobileNav() {
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="p-0 w-72">
-        <Sidebar onNavigate={() => setOpen(false)} />
+        <Sidebar onNavigate={() => setOpen(false)} role={role} />
       </SheetContent>
     </Sheet>
   );

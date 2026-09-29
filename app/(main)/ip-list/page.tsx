@@ -1,5 +1,7 @@
 import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { getSessionProfile } from "@/lib/auth/session";
+import { canDelete, canManage } from "@/lib/roles";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatDateTimeKst } from "@/lib/utils";
@@ -146,6 +148,10 @@ export default async function IpListPage({
     const page = Number(resolvedSearchParams.page) || 1;
     const limit = Number(resolvedSearchParams.limit) || 50;
 
+    const session = await getSessionProfile();
+    const canEdit = canManage(session?.role);
+    const canRemove = canDelete(session?.role);
+
     const [subnets, { data: ipAddresses, count }, recentIps] = await Promise.all([
         getSubnets(),
         getIpAddresses({ status, subnetId, description, ipAddress, page, limit }),
@@ -214,11 +220,11 @@ export default async function IpListPage({
                     <Suspense fallback={<div>로딩 중...</div>}>
                         {/* Desktop: Table */}
                         <div className="hidden md:block">
-                            <IpAddressTable ipAddresses={ipAddresses} />
+                            <IpAddressTable ipAddresses={ipAddresses} canEdit={canEdit} canDelete={canRemove} />
                         </div>
                         {/* Mobile: Card List */}
                         <div className="block md:hidden">
-                            <IpAddressList ipAddresses={ipAddresses} />
+                            <IpAddressList ipAddresses={ipAddresses} canEdit={canEdit} canDelete={canRemove} />
                         </div>
                     </Suspense>
 

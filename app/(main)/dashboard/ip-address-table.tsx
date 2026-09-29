@@ -35,6 +35,7 @@ import { updateIps } from "@/app/actions/bulk-update-ips";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Trash2, Edit, CheckSquare, MoreHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toKoreanError } from "@/lib/errors";
 
 const statusConfig = {
   available: { label: "사용 가능", className: "bg-green-100 text-green-800 hover:bg-green-100" },
@@ -45,9 +46,13 @@ const statusConfig = {
 
 interface IpAddressTableProps {
   ipAddresses: IpAddressWithSubnet[];
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
-export function IpAddressTable({ ipAddresses }: IpAddressTableProps) {
+export function IpAddressTable({ ipAddresses, canEdit = false, canDelete = false }: IpAddressTableProps) {
+  // Row selection only exists for bulk actions the role is allowed to run
+  const selectable = canEdit || canDelete;
   const [selectedIp, setSelectedIp] = useState<IpAddressWithSubnet | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -97,14 +102,14 @@ export function IpAddressTable({ ipAddresses }: IpAddressTableProps) {
 
       toast({
         title: "삭제 완료",
-        description: `${ids.length}개의 IP가 삭제되었습니다.`,
+        description: `${result.count ?? ids.length}개의 IP가 삭제되었습니다.`,
       });
       setSelectedIds(new Set());
       router.refresh();
     } catch (error) {
       toast({
         title: "삭제 실패",
-        description: error instanceof Error ? error.message : "오류가 발생했습니다.",
+        description: toKoreanError(error),
         variant: "destructive",
       });
     } finally {
@@ -123,14 +128,14 @@ export function IpAddressTable({ ipAddresses }: IpAddressTableProps) {
 
       toast({
         title: "상태 변경 완료",
-        description: `${ids.length}개의 IP 상태가 변경되었습니다.`,
+        description: `${result.count ?? ids.length}개의 IP 상태가 변경되었습니다.`,
       });
       setSelectedIds(new Set());
       router.refresh();
     } catch (error) {
       toast({
         title: "변경 실패",
-        description: error instanceof Error ? error.message : "오류가 발생했습니다.",
+        description: toKoreanError(error),
         variant: "destructive",
       });
     } finally {
@@ -141,7 +146,7 @@ export function IpAddressTable({ ipAddresses }: IpAddressTableProps) {
   return (
     <>
       <div className="space-y-4">
-        {selectedIds.size > 0 && (
+        {selectable && selectedIds.size > 0 && (
           <div className="flex items-center justify-between bg-muted/50 p-2 rounded-md border animate-in fade-in slide-in-from-top-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium ml-2">
@@ -149,6 +154,7 @@ export function IpAddressTable({ ipAddresses }: IpAddressTableProps) {
               </span>
             </div>
             <div className="flex items-center gap-2">
+              {canEdit && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" disabled={isLoading}>
@@ -171,16 +177,19 @@ export function IpAddressTable({ ipAddresses }: IpAddressTableProps) {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              )}
 
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setDeleteConfirmOpen(true)}
-                disabled={isLoading}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                삭제
-              </Button>
+              {canDelete && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  disabled={isLoading}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  삭제
+                </Button>
+              )}
             </div>
           </div>
         )}
@@ -189,15 +198,17 @@ export function IpAddressTable({ ipAddresses }: IpAddressTableProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[50px]">
-                  <Checkbox
-                    checked={
-                      selectedIds.size === ipAddresses.length && ipAddresses.length > 0
-                    }
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Select all"
-                  />
-                </TableHead>
+                {selectable && (
+                  <TableHead className="w-[50px]">
+                    <Checkbox
+                      checked={
+                        selectedIds.size === ipAddresses.length && ipAddresses.length > 0
+                      }
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
+                )}
                 <TableHead>IP 주소</TableHead>
                 <TableHead>상태</TableHead>
                 <TableHead>서브넷</TableHead>
@@ -221,13 +232,15 @@ export function IpAddressTable({ ipAddresses }: IpAddressTableProps) {
                       handleRowClick(ip);
                     }}
                   >
-                    <TableCell>
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={(checked) => handleSelectOne(ip.id, !!checked)}
-                        aria-label={`Select ${ip.ip_address}`}
-                      />
-                    </TableCell>
+                    {selectable && (
+                      <TableCell>
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={(checked) => handleSelectOne(ip.id, !!checked)}
+                          aria-label={`Select ${ip.ip_address}`}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell className="font-mono font-medium">
                       {ip.ip_address}
                     </TableCell>
@@ -263,6 +276,8 @@ export function IpAddressTable({ ipAddresses }: IpAddressTableProps) {
         ip={selectedIp}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+        canEdit={canEdit}
+        canDelete={canDelete}
       />
 
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>

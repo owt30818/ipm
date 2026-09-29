@@ -51,6 +51,7 @@ import { Profile } from "@/lib/types/database";
 import { createUser } from "@/app/actions/create-user";
 import { deleteUser } from "@/app/actions/delete-user";
 import { adminUpdatePassword } from "@/app/actions/admin-update-password";
+import { toKoreanError } from "@/lib/errors";
 
 type UserRole = "admin" | "sub_admin" | "user";
 
@@ -115,7 +116,7 @@ export function UserManagement({ users, currentUserId }: UserManagementProps) {
     } catch (error) {
       toast({
         title: "사용자 추가 실패",
-        description: error instanceof Error ? error.message : "오류가 발생했습니다.",
+        description: toKoreanError(error),
         variant: "destructive",
       });
     } finally {
@@ -165,7 +166,7 @@ export function UserManagement({ users, currentUserId }: UserManagementProps) {
     } catch (error) {
       toast({
         title: "역할 변경 실패",
-        description: error instanceof Error ? error.message : "오류가 발생했습니다.",
+        description: toKoreanError(error),
         variant: "destructive",
       });
     } finally {
@@ -199,7 +200,7 @@ export function UserManagement({ users, currentUserId }: UserManagementProps) {
     } catch (error) {
       toast({
         title: "사용자 삭제 실패",
-        description: error instanceof Error ? error.message : "오류가 발생했습니다.",
+        description: toKoreanError(error),
         variant: "destructive",
       });
     } finally {
@@ -239,7 +240,7 @@ export function UserManagement({ users, currentUserId }: UserManagementProps) {
     } catch (error) {
       toast({
         title: "비밀번호 변경 실패",
-        description: error instanceof Error ? error.message : "오류가 발생했습니다.",
+        description: toKoreanError(error),
         variant: "destructive",
       });
     } finally {

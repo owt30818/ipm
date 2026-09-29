@@ -4,8 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { shortVersionLabel } from "@/lib/build-info";
+import { canManage, type UserRole } from "@/lib/roles";
 
-const navigation = [
+const navigation: {
+  name: string;
+  href: string;
+  icon: React.ReactNode;
+  requiresManage?: boolean;
+}[] = [
   {
     name: "대시보드",
     href: "/dashboard",
@@ -47,6 +53,7 @@ const navigation = [
   {
     name: "IP 할당",
     href: "/allocate",
+    requiresManage: true,
     icon: (
       <svg
         className="w-5 h-5"
@@ -86,10 +93,12 @@ const navigation = [
 
 interface SidebarProps {
   onNavigate?: () => void;
+  role?: UserRole;
 }
 
-export function Sidebar({ onNavigate }: SidebarProps) {
+export function Sidebar({ onNavigate, role }: SidebarProps) {
   const pathname = usePathname();
+  const items = navigation.filter((item) => !item.requiresManage || canManage(role));
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800">
@@ -102,7 +111,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         </Link>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {navigation.map((item) => {
+        {items.map((item) => {
           const isActive = pathname === item.href;
           return (
             <Link

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Turnstile } from "@/components/auth/turnstile";
 import { useToast } from "@/hooks/use-toast";
+import { toKoreanError } from "@/lib/errors";
 
 export function LoginForm() {
   const [email, setEmail] = useState("");
@@ -51,7 +52,7 @@ export function LoginForm() {
       });
 
       if (error) {
-        throw new Error(error.message);
+        throw new Error(toKoreanError(error));
       }
 
       toast({
@@ -64,7 +65,7 @@ export function LoginForm() {
     } catch (error) {
       toast({
         title: "로그인 실패",
-        description: error instanceof Error ? error.message : "오류가 발생했습니다.",
+        description: toKoreanError(error),
         variant: "destructive",
       });
     } finally {
