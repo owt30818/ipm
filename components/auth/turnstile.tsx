@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
+import { getBrowserEnv } from "@/lib/env";
 
 interface TurnstileProps {
   onVerify: (token: string) => void;
@@ -38,7 +39,7 @@ export function Turnstile({ onVerify, onError, onExpire }: TurnstileProps) {
     }
 
     widgetIdRef.current = window.turnstile.render(containerRef.current, {
-      sitekey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!,
+      sitekey: getBrowserEnv().turnstileSiteKey,
       callback: onVerify,
       "error-callback": onError,
       "expired-callback": onExpire,

@@ -44,9 +44,13 @@ docker compose up --build                     # Production build
 ## Environment Setup
 
 Copy `.env.example` to `.env.local` and configure:
-- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase project credentials
+- `SUPABASE_URL` / `SUPABASE_ANON_KEY` - Supabase project credentials
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (for admin user creation)
-- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` - Cloudflare Turnstile keys
+- `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` - Cloudflare Turnstile keys
+
+All of these are read at runtime via `lib/env.ts` (the Docker image contains no config).
+The root layout injects the public ones into the browser as `window.__ENV`.
+The legacy `NEXT_PUBLIC_*` names still work as a fallback for local dev.
 
 To get `SUPABASE_SERVICE_ROLE_KEY` for local development:
 ```bash
