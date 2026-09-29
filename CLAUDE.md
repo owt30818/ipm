@@ -104,7 +104,18 @@ const { data: { user } } = await supabase.auth.getUser();
 
 ### Database RPC Functions
 
-- `allocate_contiguous_ips(p_subnet_id, p_quantity, p_description, p_user_id)` - Allocates N contiguous available IPs with row-level locking
+- `allocate_contiguous_ips(p_subnet_id, p_quantity, p_description, p_user_id, p_status, p_allocated_to)` - Allocates N contiguous available IPs with row-level locking (admin/sub_admin only, max 1024)
+- `get_next_available_ip(p_subnet_id)` - First free host IP (skips `*.0` / `*.255`), computed in the DB
+- `get_subnet_stats()` - Per-subnet capacity/status counts for the dashboard
+- `search_ip_addresses(...)` - IP list search (SECURITY INVOKER, RLS applies)
+
+RPCs are executable by `authenticated` only (never `anon`). Migrations 009/010 enforce this; keep `REVOKE ... FROM PUBLIC, anon` in any new function.
+
+### DB triggers (migration 010)
+
+- `ip_addresses`: an IP must lie inside its subnet (checked on insert and when `ip_address`/`subnet_id` change)
+- `ip_addresses`: every insert/update/delete writes `audit_logs` automatically (`auth.uid()`); do not insert audit rows from app code, clients have no INSERT rights on `audit_logs`
+- `subnets`: CIDRs must not overlap (exclusion constraint)
 
 ### Database Schema
 

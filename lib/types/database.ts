@@ -203,6 +203,24 @@ export type Database = {
         }[]
       }
       get_my_role: { Args: never; Returns: string }
+      get_next_available_ip: {
+        Args: { p_subnet_id: string }
+        Returns: string
+      }
+      get_subnet_stats: {
+        Args: never
+        Returns: {
+          id: string
+          name: string
+          cidr: string
+          total_capacity: number
+          registered: number
+          available: number
+          allocated: number
+          reserved: number
+          deprecated: number
+        }[]
+      }
       populate_subnet_hosts_fn: {
         Args: { p_subnet_id: string }
         Returns: undefined

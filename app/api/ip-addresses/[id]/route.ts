@@ -52,10 +52,10 @@ export async function PATCH(
     const body = await request.json();
     const { status, description, allocated_to } = body;
 
-    // 기존 데이터 조회
-    const { data: oldData, error: fetchError } = await supabase
+    // 존재 여부 확인 (감사 로그는 DB 트리거가 기록)
+    const { error: fetchError } = await supabase
       .from("ip_addresses")
-      .select("*")
+      .select("id")
       .eq("id", id)
       .single();
 
@@ -88,15 +88,6 @@ export async function PATCH(
       return NextResponse.json({ error: updateError.message }, { status: 400 });
     }
 
-    // Audit 로그 생성
-    await supabase.from("audit_logs").insert({
-      ip_address_id: id,
-      user_id: user.id,
-      action_type: "update",
-      old_value: oldData,
-      new_value: newData,
-    } as unknown);
-
     return NextResponse.json(newData);
   } catch (error) {
     return NextResponse.json(
@@ -122,25 +113,16 @@ export async function DELETE(
       return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
     }
 
-    // 기존 데이터 조회
-    const { data: oldData, error: fetchError } = await supabase
+    // 존재 여부 확인 (감사 로그는 DB 트리거가 기록)
+    const { error: fetchError } = await supabase
       .from("ip_addresses")
-      .select("*")
+      .select("id")
       .eq("id", id)
       .single();
 
     if (fetchError) {
       return NextResponse.json({ error: "IP를 찾을 수 없습니다." }, { status: 404 });
     }
-
-    // Audit 로그 먼저 생성 (삭제 전)
-    await supabase.from("audit_logs").insert({
-      ip_address_id: id,
-      user_id: user.id,
-      action_type: "delete",
-      old_value: oldData,
-      new_value: null,
-    } as unknown);
 
     // IP 삭제
     const { error: deleteError } = await supabase

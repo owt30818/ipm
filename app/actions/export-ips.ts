@@ -28,6 +28,20 @@ function generateCsv(headers: string[], rows: string[][]): string {
   return [headerLine, ...dataLines].join("\n");
 }
 
+// PostgREST caps a single response (default 1000 rows), so read in pages
+const PAGE_SIZE = 1000;
+const MAX_ROWS = 100000;
+
+interface ExportRow {
+  ip_address: string;
+  status: string;
+  description: string | null;
+  allocated_to: string | null;
+  allocated_at: string | null;
+  created_at: string;
+  subnet: { id: string; cidr: string; name: string } | null;
+}
+
 export async function exportIpsToCsv(filters: ExportFilters) {
   const supabase = await createClient();
 
@@ -40,39 +54,51 @@ export async function exportIpsToCsv(filters: ExportFilters) {
   }
 
   const { status, subnetId, description } = filters;
+  const data: ExportRow[] = [];
 
-  let query = supabase
-    .from("ip_addresses")
-    .select(
-      `
+  for (let from = 0; ; from += PAGE_SIZE) {
+    let query = supabase
+      .from("ip_addresses")
+      .select(
+        `
       *,
       subnet:subnets(id, cidr, name)
     `
-    )
-    .order("ip_address", { ascending: true });
+      )
+      .order("ip_address", { ascending: true });
 
-  if (status) {
-    query = query.eq("status", status);
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    if (subnetId) {
+      query = query.eq("subnet_id", subnetId);
+    }
+
+    if (description) {
+      query = query.or(
+        `description.ilike.%${description}%,allocated_to.ilike.%${description}%`
+      );
+    }
+
+    const { data: page, error } = await query.range(from, from + PAGE_SIZE - 1);
+
+    if (error) {
+      console.error("Error fetching IP addresses:", error);
+      return { error: "IP 주소를 불러오는데 실패했습니다." };
+    }
+
+    const rows = (page ?? []) as unknown as ExportRow[];
+    data.push(...rows);
+
+    if (data.length > MAX_ROWS) {
+      return { error: `내보낼 항목이 ${MAX_ROWS.toLocaleString()}개를 넘습니다. 필터로 범위를 좁혀주세요.` };
+    }
+
+    if (rows.length < PAGE_SIZE) break;
   }
 
-  if (subnetId) {
-    query = query.eq("subnet_id", subnetId);
-  }
-
-  if (description) {
-    query = query.or(
-      `description.ilike.%${description}%,allocated_to.ilike.%${description}%`
-    );
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    console.error("Error fetching IP addresses:", error);
-    return { error: "IP 주소를 불러오는데 실패했습니다." };
-  }
-
-  if (!data || data.length === 0) {
+  if (data.length === 0) {
     return { error: "내보낼 IP 주소가 없습니다." };
   }
 
