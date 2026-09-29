@@ -26,12 +26,15 @@ interface AllocateFormProps {
 
 type IpStatus = "available" | "allocated" | "reserved" | "deprecated";
 
+// New registrations are normally issued to someone, so the form starts (and resets) as "할당됨"
+const DEFAULT_STATUS: IpStatus = "allocated";
+
 export function AllocateForm({ subnets }: AllocateFormProps) {
   const [allocationMode, setAllocationMode] = useState<"single" | "auto">("single");
   const [subnetId, setSubnetId] = useState("");
   const [ipAddress, setIpAddress] = useState("");
   const [quantity, setQuantity] = useState(1);
-  const [status, setStatus] = useState<IpStatus>("available");
+  const [status, setStatus] = useState<IpStatus>(DEFAULT_STATUS);
   const [description, setDescription] = useState("");
   const [allocatedTo, setAllocatedTo] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -170,7 +173,7 @@ export function AllocateForm({ subnets }: AllocateFormProps) {
       setQuantity(1);
       setDescription("");
       setAllocatedTo("");
-      setStatus("allocated");
+      setStatus(DEFAULT_STATUS);
 
       router.refresh();
     } catch (error) {
