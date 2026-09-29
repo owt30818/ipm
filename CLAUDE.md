@@ -145,6 +145,13 @@ Rules live in `lib/roles.ts` and mirror the RLS policies (the database stays the
 
 Never show `error.message` from Supabase/Postgres directly. Use `toKoreanError(error)` from `lib/errors.ts`; it maps SQLSTATE codes, constraint names, our own SQL exceptions (migrations 009/010), Supabase Auth codes and network failures, and falls back to a generic Korean message. Messages already in Korean pass through unchanged.
 
+### CSV import and export
+
+- Import rules live in `lib/csv-import.ts` (pure functions), the UI in `app/(main)/allocate/csv-upload.tsx`. Every row is classified before anything is written: invalid IP (leading zeros are rejected), unknown status, in-file duplicate, outside the chosen subnet, or already registered (checked in chunks of 200 against the DB). Only clean rows are selectable; inserts run in chunks of 500 with `upsert ... ignoreDuplicates` and report the real inserted count. Limits: 5MB / 10,000 rows. Korean status labels and EUC-KR files (Excel "CSV") are accepted.
+- Export (`app/actions/export-ips.ts`) calls the same `search_ip_addresses` RPC as the list (all filters, paged by the rows actually returned), prefixes cells starting with `= + - @` with `'` against spreadsheet formula injection, and prints dates in KST.
+- Radix `Checkbox` inside a `<form>` clicks a hidden input whenever `checked` changes; a row-level `onClick` must not receive that click (wrap the checkbox cell with `onClick={(e) => e.stopPropagation()}`), otherwise selection toggles itself in an endless loop.
+- Pages that cannot load their data show `ErrorNotice` (`components/ui/error-notice.tsx`) with the Korean reason instead of empty/zero values.
+
 ### Responsive Layout
 
 - **Desktop:** Fixed left sidebar (`hidden md:block`)

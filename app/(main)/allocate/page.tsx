@@ -23,6 +23,23 @@ async function getSubnets() {
   return data ?? [];
 }
 
+// Registered IP count per subnet (shown in the delete confirmation); undefined if it cannot be loaded
+async function getSubnetIpCounts(): Promise<Record<string, number> | undefined> {
+  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = (await (supabase.rpc as any)("get_subnet_stats")) as {
+    data: { id: string; registered: number }[] | null;
+    error: { message: string } | null;
+  };
+
+  if (error || !data) {
+    console.error("Error fetching subnet IP counts:", error);
+    return undefined;
+  }
+
+  return Object.fromEntries(data.map((row) => [row.id, Number(row.registered)]));
+}
+
 export default async function AllocatePage() {
   const session = await getSessionProfile();
 
@@ -48,7 +65,7 @@ export default async function AllocatePage() {
     );
   }
 
-  const subnets = await getSubnets();
+  const [subnets, ipCounts] = await Promise.all([getSubnets(), getSubnetIpCounts()]);
 
   return (
     <div className="space-y-6">
@@ -101,7 +118,7 @@ export default async function AllocatePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <SubnetForm subnets={subnets} canDelete={canDelete(session.role)} />
+              <SubnetForm subnets={subnets} ipCounts={ipCounts} canDelete={canDelete(session.role)} />
             </CardContent>
           </Card>
         </TabsContent>

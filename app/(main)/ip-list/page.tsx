@@ -5,6 +5,8 @@ import { canDelete, canManage } from "@/lib/roles";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatDateTimeKst } from "@/lib/utils";
+import { ErrorNotice } from "@/components/ui/error-notice";
+import { toKoreanError } from "@/lib/errors";
 import { IpAddressTable } from "../dashboard/ip-address-table";
 import { IpAddressList } from "../dashboard/ip-address-list";
 import { PaginationControl } from "@/components/pagination-control";
@@ -52,17 +54,20 @@ async function getRecentIssuedIps(limit = 5) {
             .limit(limit),
     ]);
 
-    if (withDate.error || withoutDate.error) {
-        console.error("Error fetching recent IPs:", withDate.error ?? withoutDate.error);
-        return [];
+    const failure = withDate.error ?? withoutDate.error;
+    if (failure) {
+        console.error("Error fetching recent IPs:", failure);
+        return { items: [], error: toKoreanError(failure) };
     }
 
     const rows = [...(withDate.data ?? []), ...(withoutDate.data ?? [])] as unknown as RecentIssuedIp[];
 
-    return rows
+    const items = rows
         .map((row) => ({ ...row, issuedAt: row.allocated_at ?? row.created_at }))
         .sort((a, b) => new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime())
         .slice(0, limit);
+
+    return { items, error: null };
 }
 
 interface FilterParams {
@@ -91,7 +96,7 @@ async function getIpAddresses(filters: FilterParams) {
 
     if (error) {
         console.error("Error fetching IP addresses:", error);
-        return { data: [], count: 0 };
+        return { data: [], count: 0, error: toKoreanError(error) };
     }
 
     // RPC 결과를 기존 형식으로 변환
@@ -125,7 +130,7 @@ async function getIpAddresses(filters: FilterParams) {
         },
     }));
 
-    return { data: formattedData, count: Number(count) };
+    return { data: formattedData, count: Number(count), error: null };
 }
 
 export default async function IpListPage({
@@ -145,14 +150,15 @@ export default async function IpListPage({
     const subnetId = resolvedSearchParams.subnet;
     const description = resolvedSearchParams.description;
     const ipAddress = resolvedSearchParams.ip;
-    const page = Number(resolvedSearchParams.page) || 1;
-    const limit = Number(resolvedSearchParams.limit) || 50;
+    // page-size options in the UI go up to 100; never trust larger values from the URL
+    const page = Math.max(1, Math.floor(Number(resolvedSearchParams.page)) || 1);
+    const limit = Math.min(100, Math.max(1, Math.floor(Number(resolvedSearchParams.limit)) || 50));
 
     const session = await getSessionProfile();
     const canEdit = canManage(session?.role);
     const canRemove = canDelete(session?.role);
 
-    const [subnets, { data: ipAddresses, count }, recentIps] = await Promise.all([
+    const [subnets, { data: ipAddresses, count, error: listError }, { items: recentIps, error: recentError }] = await Promise.all([
         getSubnets(),
         getIpAddresses({ status, subnetId, description, ipAddress, page, limit }),
         getRecentIssuedIps(5),
@@ -172,7 +178,9 @@ export default async function IpListPage({
                     <CardDescription>가장 최근에 할당된 IP 5개</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {recentIps.length === 0 ? (
+                    {recentError ? (
+                        <ErrorNotice title="최근 발급된 IP를 불러오지 못했습니다" message={recentError} />
+                    ) : recentIps.length === 0 ? (
                         <p className="text-sm text-muted-foreground">발급된 IP가 없습니다.</p>
                     ) : (
                         <ul className="divide-y">
@@ -217,22 +225,28 @@ export default async function IpListPage({
                     <ExportButton />
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <Suspense fallback={<div>로딩 중...</div>}>
-                        {/* Desktop: Table */}
-                        <div className="hidden md:block">
-                            <IpAddressTable ipAddresses={ipAddresses} canEdit={canEdit} canDelete={canRemove} />
-                        </div>
-                        {/* Mobile: Card List */}
-                        <div className="block md:hidden">
-                            <IpAddressList ipAddresses={ipAddresses} canEdit={canEdit} canDelete={canRemove} />
-                        </div>
-                    </Suspense>
+                    {listError ? (
+                        <ErrorNotice title="IP 목록을 불러오지 못했습니다" message={listError} />
+                    ) : (
+                        <>
+                            <Suspense fallback={<div>로딩 중...</div>}>
+                                {/* Desktop: Table */}
+                                <div className="hidden md:block">
+                                    <IpAddressTable ipAddresses={ipAddresses} canEdit={canEdit} canDelete={canRemove} />
+                                </div>
+                                {/* Mobile: Card List */}
+                                <div className="block md:hidden">
+                                    <IpAddressList ipAddresses={ipAddresses} canEdit={canEdit} canDelete={canRemove} />
+                                </div>
+                            </Suspense>
 
-                    <PaginationControl
-                        total={count}
-                        page={page}
-                        limit={limit}
-                    />
+                            <PaginationControl
+                                total={count}
+                                page={page}
+                                limit={limit}
+                            />
+                        </>
+                    )}
                 </CardContent>
             </Card>
         </div>

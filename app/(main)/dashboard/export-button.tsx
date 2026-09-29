@@ -20,6 +20,7 @@ export function ExportButton() {
         status: searchParams.get("status") || undefined,
         subnetId: searchParams.get("subnet") || undefined,
         description: searchParams.get("description") || undefined,
+        ipAddress: searchParams.get("ip") || undefined,
       };
 
       const result = await exportIpsToCsv(filters);

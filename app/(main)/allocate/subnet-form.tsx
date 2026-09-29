@@ -40,9 +40,10 @@ import { toKoreanError } from "@/lib/errors";
 interface SubnetFormProps {
   subnets: Subnet[];
   canDelete?: boolean;
+  ipCounts?: Record<string, number>;
 }
 
-export function SubnetForm({ subnets, canDelete = false }: SubnetFormProps) {
+export function SubnetForm({ subnets, canDelete = false, ipCounts }: SubnetFormProps) {
   const [name, setName] = useState("");
   const [cidr, setCidr] = useState("");
   const [description, setDescription] = useState("");
@@ -59,6 +60,7 @@ export function SubnetForm({ subnets, canDelete = false }: SubnetFormProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingSubnet, setDeletingSubnet] = useState<Subnet | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const deletingCount = deletingSubnet ? ipCounts?.[deletingSubnet.id] : undefined;
 
   const router = useRouter();
   const { toast } = useToast();
@@ -285,6 +287,11 @@ export function SubnetForm({ subnets, canDelete = false }: SubnetFormProps) {
                       <p className="text-sm text-muted-foreground font-mono">
                         {subnet.cidr}
                       </p>
+                      {ipCounts && (
+                        <p className="text-xs text-muted-foreground">
+                          등록된 IP {ipCounts[subnet.id] ?? 0}개
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline">활성</Badge>
@@ -383,9 +390,18 @@ export function SubnetForm({ subnets, canDelete = false }: SubnetFormProps) {
             <AlertDialogDescription>
               <strong>{deletingSubnet?.name}</strong> 서브넷을 삭제하시겠습니까?
               <br />
-              <span className="text-red-600">
-                이 서브넷에 속한 모든 IP 주소도 함께 삭제됩니다.
-              </span>
+              {deletingCount === undefined ? (
+                <span className="text-red-600">
+                  이 서브넷에 속한 모든 IP 주소도 함께 삭제됩니다.
+                </span>
+              ) : deletingCount > 0 ? (
+                <span className="text-red-600">
+                  이 서브넷에 등록된 <strong>{deletingCount}개의 IP 주소</strong>도 함께 삭제되며,
+                  되돌릴 수 없습니다. (삭제 내역은 감사 로그에 남습니다.)
+                </span>
+              ) : (
+                <span>등록된 IP 주소가 없어 서브넷만 삭제됩니다.</span>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

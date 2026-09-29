@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ErrorNotice } from "@/components/ui/error-notice";
+import { toKoreanError } from "@/lib/errors";
 
 interface SubnetStats {
   id: string;
@@ -26,7 +28,7 @@ interface SubnetStatsRow {
   deprecated: number;
 }
 
-async function getSubnetStats(): Promise<SubnetStats[]> {
+async function getSubnetStats(): Promise<{ stats: SubnetStats[]; error: string | null }> {
   const supabase = await createClient();
 
   // 서브넷별 집계를 DB에서 한 번에 계산 (get_subnet_stats)
@@ -38,10 +40,10 @@ async function getSubnetStats(): Promise<SubnetStats[]> {
 
   if (error) {
     console.error("Error fetching subnet stats:", error);
-    return [];
+    return { stats: [], error: toKoreanError(error) };
   }
 
-  return (data ?? []).map((row) => ({
+  const stats = (data ?? []).map((row) => ({
     id: row.id,
     name: row.name,
     cidr: row.cidr,
@@ -53,10 +55,12 @@ async function getSubnetStats(): Promise<SubnetStats[]> {
     deprecated: row.deprecated,
     unregistered: Math.max(row.total_capacity - row.registered, 0),
   }));
+
+  return { stats, error: null };
 }
 
 export default async function DashboardPage() {
-  const subnetStats = await getSubnetStats();
+  const { stats: subnetStats, error: statsError } = await getSubnetStats();
 
   // 전체 합계 계산
   const totals = subnetStats.reduce(
@@ -70,12 +74,32 @@ export default async function DashboardPage() {
     { total: 0, available: 0, allocated: 0, reserved: 0, unregistered: 0 }
   );
 
+  if (statsError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">대시보드</h1>
+          <p className="text-muted-foreground">IP 주소 현황을 확인하세요</p>
+        </div>
+        <ErrorNotice title="통계를 불러오지 못했습니다" message={statsError} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">대시보드</h1>
         <p className="text-muted-foreground">IP 주소 현황을 확인하세요</p>
       </div>
+
+      {subnetStats.length === 0 && (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            등록된 서브넷이 없습니다. 관리자에게 서브넷 등록을 요청하세요.
+          </CardContent>
+        </Card>
+      )}
 
       {/* 전체 통계 요약 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

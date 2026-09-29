@@ -1,11 +1,15 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getSessionProfile } from "@/lib/auth/session";
+import { toKoreanError } from "@/lib/errors";
+import { formatDateTimeKst } from "@/lib/utils";
 
 interface ExportFilters {
   status?: string;
   subnetId?: string;
   description?: string;
+  ipAddress?: string;
 }
 
 const statusLabels: Record<string, string> = {
@@ -15,8 +19,13 @@ const statusLabels: Record<string, string> = {
   deprecated: "사용 안 함",
 };
 
-function escapeCsvField(field: string): string {
-  if (field.includes(",") || field.includes('"') || field.includes("\n")) {
+// Spreadsheets run cells that start with = + - @ as formulas (CSV injection), so neutralize them
+function escapeCsvField(value: string): string {
+  let field = value;
+  if (/^[=+\-@\t\r]/.test(field)) {
+    field = `'${field}`;
+  }
+  if (/[",\n\r]/.test(field)) {
     return `"${field.replace(/"/g, '""')}"`;
   }
   return field;
@@ -28,7 +37,12 @@ function generateCsv(headers: string[], rows: string[][]): string {
   return [headerLine, ...dataLines].join("\n");
 }
 
-// PostgREST caps a single response (default 1000 rows), so read in pages
+function dateKst(iso: string | null): string {
+  return iso ? formatDateTimeKst(iso).split(" ")[0] : "";
+}
+
+// Same search function as the IP list, so the export always matches what is on screen.
+// A single response is capped by the API (default 1000 rows), so page by what was actually returned.
 const PAGE_SIZE = 1000;
 const MAX_ROWS = 100000;
 
@@ -39,63 +53,49 @@ interface ExportRow {
   allocated_to: string | null;
   allocated_at: string | null;
   created_at: string;
-  subnet: { id: string; cidr: string; name: string } | null;
+  subnet_name: string | null;
+  subnet_cidr: string | null;
+  total_count: number | string;
 }
 
 export async function exportIpsToCsv(filters: ExportFilters) {
-  const supabase = await createClient();
+  const session = await getSessionProfile();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  if (!session) {
     return { error: "인증이 필요합니다." };
   }
 
-  const { status, subnetId, description } = filters;
+  const supabase = await createClient();
+  const { status, subnetId, description, ipAddress } = filters;
   const data: ExportRow[] = [];
+  let total = Infinity;
 
-  for (let from = 0; ; from += PAGE_SIZE) {
-    let query = supabase
-      .from("ip_addresses")
-      .select(
-        `
-      *,
-      subnet:subnets(id, cidr, name)
-    `
-      )
-      .order("ip_address", { ascending: true });
-
-    if (status) {
-      query = query.eq("status", status);
-    }
-
-    if (subnetId) {
-      query = query.eq("subnet_id", subnetId);
-    }
-
-    if (description) {
-      query = query.or(
-        `description.ilike.%${description}%,allocated_to.ilike.%${description}%`
-      );
-    }
-
-    const { data: page, error } = await query.range(from, from + PAGE_SIZE - 1);
+  while (data.length < total) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: page, error } = (await (supabase.rpc as any)("search_ip_addresses", {
+      p_status: status || null,
+      p_subnet_id: subnetId || null,
+      p_description: description || null,
+      p_ip_address: ipAddress || null,
+      p_limit: PAGE_SIZE,
+      p_offset: data.length,
+    })) as { data: ExportRow[] | null; error: { message: string } | null };
 
     if (error) {
       console.error("Error fetching IP addresses:", error);
-      return { error: "IP 주소를 불러오는데 실패했습니다." };
+      return { error: toKoreanError(error, "IP 주소를 불러오는데 실패했습니다.") };
     }
 
-    const rows = (page ?? []) as unknown as ExportRow[];
-    data.push(...rows);
+    if (!page || page.length === 0) break;
 
-    if (data.length > MAX_ROWS) {
-      return { error: `내보낼 항목이 ${MAX_ROWS.toLocaleString()}개를 넘습니다. 필터로 범위를 좁혀주세요.` };
+    if (data.length === 0) {
+      total = Number(page[0].total_count);
+      if (total > MAX_ROWS) {
+        return { error: `내보낼 항목이 ${MAX_ROWS.toLocaleString()}개를 넘습니다. 필터로 범위를 좁혀주세요.` };
+      }
     }
 
-    if (rows.length < PAGE_SIZE) break;
+    data.push(...page);
   }
 
   if (data.length === 0) {
@@ -105,14 +105,14 @@ export async function exportIpsToCsv(filters: ExportFilters) {
   const headers = ["IP 주소", "상태", "서브넷", "CIDR", "설명", "할당 대상", "할당일", "생성일"];
 
   const rows = data.map((ip) => [
-    ip.ip_address,
+    String(ip.ip_address).replace(/\/32$/, ""),
     statusLabels[ip.status] || ip.status,
-    ip.subnet?.name || "-",
-    ip.subnet?.cidr || "-",
+    ip.subnet_name || "-",
+    ip.subnet_cidr || "-",
     ip.description || "",
     ip.allocated_to || "",
-    ip.allocated_at ? new Date(ip.allocated_at).toLocaleDateString("ko-KR") : "",
-    new Date(ip.created_at).toLocaleDateString("ko-KR"),
+    dateKst(ip.allocated_at),
+    dateKst(ip.created_at),
   ]);
 
   const csv = generateCsv(headers, rows);
