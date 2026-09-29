@@ -14,6 +14,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Supabase/Turnstile config is read at runtime (see lib/env.ts), nothing is baked in
+# GIT_SHA is build metadata shown on /about (.git is not in the build context)
+ARG GIT_SHA=""
+ENV GIT_SHA=$GIT_SHA
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 

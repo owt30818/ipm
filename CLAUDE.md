@@ -130,6 +130,7 @@ Row Level Security (RLS) is enabled. Use `get_my_role()` function for role check
 | `/allocate` | IP allocation forms (subnet selection, quantity input, CSV upload) |
 | `/dashboard` | IP search and status overview with filtering |
 | `/settings` | Profile, user management (admin), audit log viewer |
+| `/about` | App version/build date/commit and installed package versions (from `next.config.ts` build metadata) |
 
 ### User Management (Settings Page)
 
