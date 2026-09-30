@@ -49,12 +49,13 @@ export function SearchFilters({ subnets }: SearchFiltersProps) {
     [router, searchParams]
   );
 
-  // The sort order is a view preference, not a filter: keep it when filters are reset
+  // Reset everything, including the sort order (back to IP 주소순)
   const clearFilters = useCallback(() => {
-    router.push(sort === DEFAULT_IP_SORT ? pathname : `${pathname}?sort=${sort}`);
-  }, [router, pathname, sort]);
+    router.push(pathname);
+  }, [router, pathname]);
 
   const hasFilters = status || subnetId || description || ipAddress;
+  const canReset = hasFilters || sort !== DEFAULT_IP_SORT;
 
   return (
     <div className="space-y-4">
@@ -157,7 +158,7 @@ export function SearchFilters({ subnets }: SearchFiltersProps) {
             variant="outline"
             className="w-full"
             onClick={clearFilters}
-            disabled={!hasFilters}
+            disabled={!canReset}
           >
             필터 초기화
           </Button>

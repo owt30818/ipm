@@ -18,6 +18,22 @@ function getCommit(): string {
   }
 }
 
+// package.json holds major.minor; the patch number is the commit count, so every push gets a new
+// version without editing package.json. CI passes BUILD_NUMBER (git is not in the Docker context).
+function getVersion(): string {
+  const base: string = readJson("package.json").version;
+  let count = process.env.BUILD_NUMBER;
+  if (!count) {
+    try {
+      count = execSync("git rev-list --count HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+    } catch {
+      return base;
+    }
+  }
+  const [major, minor] = base.split(".");
+  return /^\d+$/.test(count) ? `${major}.${minor}.${count}` : base;
+}
+
 function getPackages() {
   const pkg = readJson("package.json");
   const lock = readJson("package-lock.json");
@@ -41,7 +57,7 @@ function getPackages() {
 const nextConfig: NextConfig = {
   output: "standalone",
   env: {
-    APP_VERSION: readJson("package.json").version,
+    APP_VERSION: getVersion(),
     APP_BUILD_TIME: new Date().toISOString(),
     APP_COMMIT: getCommit(),
     APP_PACKAGES: JSON.stringify(getPackages()),

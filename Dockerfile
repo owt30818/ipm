@@ -17,6 +17,9 @@ COPY . .
 # GIT_SHA is build metadata shown on /about (.git is not in the build context)
 ARG GIT_SHA=""
 ENV GIT_SHA=$GIT_SHA
+# BUILD_NUMBER (commit count) becomes the patch part of the version shown on /about
+ARG BUILD_NUMBER=""
+ENV BUILD_NUMBER=$BUILD_NUMBER
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
