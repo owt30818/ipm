@@ -107,7 +107,7 @@ const { data: { user } } = await supabase.auth.getUser();
 - `allocate_contiguous_ips(p_subnet_id, p_quantity, p_description, p_user_id, p_status, p_allocated_to)` - Allocates N contiguous available IPs with row-level locking (admin/sub_admin only, max 1024)
 - `get_next_available_ip(p_subnet_id)` - First free host IP (skips `*.0` / `*.255`), computed in the DB
 - `get_subnet_stats()` - Per-subnet capacity/status counts for the dashboard
-- `search_ip_addresses(...)` - IP list search (SECURITY INVOKER, RLS applies)
+- `search_ip_addresses(..., p_sort)` - IP list search (SECURITY INVOKER, RLS applies). `p_sort`: `ip_asc` (default), `issued_desc`, `issued_asc`; issued time = `allocated_at`, or `created_at` when null (migration 012, options in `lib/ip-sort.ts`). The list, its search filters and the CSV export all use it, so they always show the same order
 
 RPCs are executable by `authenticated` only (never `anon`). Migrations 009/010 enforce this; keep `REVOKE ... FROM PUBLIC, anon` in any new function.
 

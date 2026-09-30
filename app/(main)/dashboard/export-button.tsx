@@ -21,6 +21,7 @@ export function ExportButton() {
         subnetId: searchParams.get("subnet") || undefined,
         description: searchParams.get("description") || undefined,
         ipAddress: searchParams.get("ip") || undefined,
+        sort: searchParams.get("sort") || undefined,
       };
 
       const result = await exportIpsToCsv(filters);

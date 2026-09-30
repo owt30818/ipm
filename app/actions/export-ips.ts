@@ -4,12 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/auth/session";
 import { toKoreanError } from "@/lib/errors";
 import { formatDateTimeKst } from "@/lib/utils";
+import { parseIpSort } from "@/lib/ip-sort";
 
 interface ExportFilters {
   status?: string;
   subnetId?: string;
   description?: string;
   ipAddress?: string;
+  sort?: string;
 }
 
 const statusLabels: Record<string, string> = {
@@ -38,7 +40,7 @@ function generateCsv(headers: string[], rows: string[][]): string {
 }
 
 function dateKst(iso: string | null): string {
-  return iso ? formatDateTimeKst(iso).split(" ")[0] : "";
+  return iso ? formatDateTimeKst(iso) : "";
 }
 
 // Same search function as the IP list, so the export always matches what is on screen.
@@ -66,7 +68,7 @@ export async function exportIpsToCsv(filters: ExportFilters) {
   }
 
   const supabase = await createClient();
-  const { status, subnetId, description, ipAddress } = filters;
+  const { status, subnetId, description, ipAddress, sort } = filters;
   const data: ExportRow[] = [];
   let total = Infinity;
 
@@ -79,6 +81,7 @@ export async function exportIpsToCsv(filters: ExportFilters) {
       p_ip_address: ipAddress || null,
       p_limit: PAGE_SIZE,
       p_offset: data.length,
+      p_sort: parseIpSort(sort),
     })) as { data: ExportRow[] | null; error: { message: string } | null };
 
     if (error) {
@@ -102,7 +105,7 @@ export async function exportIpsToCsv(filters: ExportFilters) {
     return { error: "내보낼 IP 주소가 없습니다." };
   }
 
-  const headers = ["IP 주소", "상태", "서브넷", "CIDR", "설명", "할당 대상", "할당일", "생성일"];
+  const headers = ["IP 주소", "상태", "서브넷", "CIDR", "설명", "할당 대상", "할당 일시", "등록 일시"];
 
   const rows = data.map((ip) => [
     String(ip.ip_address).replace(/\/32$/, ""),

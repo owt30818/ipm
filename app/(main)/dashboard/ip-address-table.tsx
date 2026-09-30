@@ -31,6 +31,7 @@ import {
 import { IpAddressWithSubnet } from "@/lib/types/database";
 import { IpDetailDialog } from "@/components/ip/ip-detail-dialog";
 import { CopyIpButton } from "@/components/ip/copy-ip-button";
+import { formatDateTimeKst } from "@/lib/utils";
 import { deleteIps } from "@/app/actions/bulk-delete-ips";
 import { updateIps } from "@/app/actions/bulk-update-ips";
 import { useToast } from "@/hooks/use-toast";
@@ -215,7 +216,8 @@ export function IpAddressTable({ ipAddresses, canEdit = false, canDelete = false
                 <TableHead>서브넷</TableHead>
                 <TableHead>설명</TableHead>
                 <TableHead>할당 대상</TableHead>
-                <TableHead>할당일</TableHead>
+                <TableHead>할당 일시</TableHead>
+                <TableHead>등록 일시</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -263,10 +265,11 @@ export function IpAddressTable({ ipAddresses, canEdit = false, canDelete = false
                       {ip.description ?? "-"}
                     </TableCell>
                     <TableCell>{ip.allocated_to ?? "-"}</TableCell>
-                    <TableCell>
-                      {ip.allocated_at
-                        ? new Date(ip.allocated_at).toLocaleDateString("ko-KR")
-                        : "-"}
+                    <TableCell className="font-mono text-xs whitespace-nowrap">
+                      {ip.allocated_at ? formatDateTimeKst(ip.allocated_at) : "-"}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs whitespace-nowrap text-muted-foreground">
+                      {formatDateTimeKst(ip.created_at)}
                     </TableCell>
                   </TableRow>
                 );

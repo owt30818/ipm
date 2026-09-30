@@ -2,12 +2,10 @@ import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionProfile } from "@/lib/auth/session";
 import { canDelete, canManage } from "@/lib/roles";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { formatDateTimeKst } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorNotice } from "@/components/ui/error-notice";
-import { CopyIpButton } from "@/components/ip/copy-ip-button";
 import { toKoreanError } from "@/lib/errors";
+import { parseIpSort, type IpSort } from "@/lib/ip-sort";
 import { IpAddressTable } from "../dashboard/ip-address-table";
 import { IpAddressList } from "../dashboard/ip-address-list";
 import { PaginationControl } from "@/components/pagination-control";
@@ -23,54 +21,6 @@ async function getSubnets() {
     return data ?? [];
 }
 
-interface RecentIssuedIp {
-    id: string;
-    ip_address: string;
-    allocated_to: string | null;
-    allocated_at: string | null;
-    created_at: string;
-    subnet: { name: string; cidr: string } | null;
-}
-
-// 최근 발급(상태가 "할당됨")된 IP. allocated_at은 할당 대상을 입력했을 때만 채워지므로
-// 값이 없는 행은 등록 시각(created_at)을 발급 시각으로 보고 두 결과를 합쳐 정렬한다.
-async function getRecentIssuedIps(limit = 5) {
-    const supabase = await createClient();
-    const columns = "id, ip_address, allocated_to, allocated_at, created_at, subnet:subnets(name, cidr)";
-
-    const [withDate, withoutDate] = await Promise.all([
-        supabase
-            .from("ip_addresses")
-            .select(columns)
-            .eq("status", "allocated")
-            .not("allocated_at", "is", null)
-            .order("allocated_at", { ascending: false })
-            .limit(limit),
-        supabase
-            .from("ip_addresses")
-            .select(columns)
-            .eq("status", "allocated")
-            .is("allocated_at", null)
-            .order("created_at", { ascending: false })
-            .limit(limit),
-    ]);
-
-    const failure = withDate.error ?? withoutDate.error;
-    if (failure) {
-        console.error("Error fetching recent IPs:", failure);
-        return { items: [], error: toKoreanError(failure) };
-    }
-
-    const rows = [...(withDate.data ?? []), ...(withoutDate.data ?? [])] as unknown as RecentIssuedIp[];
-
-    const items = rows
-        .map((row) => ({ ...row, issuedAt: row.allocated_at ?? row.created_at }))
-        .sort((a, b) => new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime())
-        .slice(0, limit);
-
-    return { items, error: null };
-}
-
 interface FilterParams {
     status?: string;
     subnetId?: string;
@@ -78,10 +28,11 @@ interface FilterParams {
     ipAddress?: string;
     page?: number;
     limit?: number;
+    sort?: IpSort;
 }
 
 async function getIpAddresses(filters: FilterParams) {
-    const { status, subnetId, description, ipAddress, page = 1, limit = 50 } = filters;
+    const { status, subnetId, description, ipAddress, page = 1, limit = 50, sort } = filters;
     const supabase = await createClient();
     const offset = (page - 1) * limit;
 
@@ -93,6 +44,7 @@ async function getIpAddresses(filters: FilterParams) {
         p_ip_address: ipAddress || null,
         p_limit: limit,
         p_offset: offset,
+        p_sort: sort,
     });
 
     if (error) {
@@ -144,6 +96,7 @@ export default async function IpListPage({
         ip?: string;
         page?: string;
         limit?: string;
+        sort?: string;
     }>;
 }) {
     const resolvedSearchParams = await searchParams;
@@ -151,6 +104,7 @@ export default async function IpListPage({
     const subnetId = resolvedSearchParams.subnet;
     const description = resolvedSearchParams.description;
     const ipAddress = resolvedSearchParams.ip;
+    const sort = parseIpSort(resolvedSearchParams.sort);
     // page-size options in the UI go up to 100; never trust larger values from the URL
     const page = Math.max(1, Math.floor(Number(resolvedSearchParams.page)) || 1);
     const limit = Math.min(100, Math.max(1, Math.floor(Number(resolvedSearchParams.limit)) || 50));
@@ -159,10 +113,9 @@ export default async function IpListPage({
     const canEdit = canManage(session?.role);
     const canRemove = canDelete(session?.role);
 
-    const [subnets, { data: ipAddresses, count, error: listError }, { items: recentIps, error: recentError }] = await Promise.all([
+    const [subnets, { data: ipAddresses, count, error: listError }] = await Promise.all([
         getSubnets(),
-        getIpAddresses({ status, subnetId, description, ipAddress, page, limit }),
-        getRecentIssuedIps(5),
+        getIpAddresses({ status, subnetId, description, ipAddress, page, limit, sort }),
     ]);
 
     return (
@@ -171,44 +124,6 @@ export default async function IpListPage({
                 <h1 className="text-2xl font-bold">IP 목록</h1>
                 <p className="text-muted-foreground">IP 주소를 검색하고 관리하세요</p>
             </div>
-
-            {/* Recently issued IPs */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>최근 발급된 IP</CardTitle>
-                    <CardDescription>가장 최근에 할당된 IP 5개</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {recentError ? (
-                        <ErrorNotice title="최근 발급된 IP를 불러오지 못했습니다" message={recentError} />
-                    ) : recentIps.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">발급된 IP가 없습니다.</p>
-                    ) : (
-                        <ul className="divide-y">
-                            {recentIps.map((ip) => (
-                                <li
-                                    key={ip.id}
-                                    className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between"
-                                >
-                                    <div className="flex items-center gap-3 min-w-0">
-                                        <span className="font-mono font-medium">{ip.ip_address}</span>
-                                        <CopyIpButton ip={ip.ip_address} className="-ml-2" />
-                                        <Badge variant="secondary" className="truncate">
-                                            {ip.subnet?.name ?? "-"}
-                                        </Badge>
-                                    </div>
-                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                                        <span>{ip.allocated_to || "할당 대상 없음"}</span>
-                                        <time dateTime={ip.issuedAt} className="font-mono">
-                                            {formatDateTimeKst(ip.issuedAt)}
-                                        </time>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </CardContent>
-            </Card>
 
             {/* Search Filters */}
             <Card>

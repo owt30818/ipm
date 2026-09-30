@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { DEFAULT_IP_SORT, IP_SORTS, IP_SORT_LABELS, parseIpSort } from "@/lib/ip-sort";
 
 interface Subnet {
   id: string;
@@ -31,6 +32,7 @@ export function SearchFilters({ subnets }: SearchFiltersProps) {
   const subnetId = searchParams.get("subnet") || "";
   const description = searchParams.get("description") || "";
   const ipAddress = searchParams.get("ip") || "";
+  const sort = parseIpSort(searchParams.get("sort"));
 
   const updateFilters = useCallback(
     (key: string, value: string) => {
@@ -47,15 +49,16 @@ export function SearchFilters({ subnets }: SearchFiltersProps) {
     [router, searchParams]
   );
 
+  // The sort order is a view preference, not a filter: keep it when filters are reset
   const clearFilters = useCallback(() => {
-    router.push(pathname);
-  }, [router, pathname]);
+    router.push(sort === DEFAULT_IP_SORT ? pathname : `${pathname}?sort=${sort}`);
+  }, [router, pathname, sort]);
 
   const hasFilters = status || subnetId || description || ipAddress;
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-4">
         {/* 상태 필터 */}
         <div className="space-y-2">
           <label className="text-sm font-medium">상태</label>
@@ -125,6 +128,26 @@ export function SearchFilters({ subnets }: SearchFiltersProps) {
               defaultValue={ipAddress}
             />
           </form>
+        </div>
+
+        {/* 정렬 (할당 시각, 없으면 등록 시각 기준) */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">정렬</label>
+          <Select
+            value={sort}
+            onValueChange={(v) => updateFilters("sort", v === DEFAULT_IP_SORT ? "" : v)}
+          >
+            <SelectTrigger title="발급 시각 = 할당 시각(없으면 등록 시각)">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {IP_SORTS.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {IP_SORT_LABELS[value]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* 초기화 버튼 */}

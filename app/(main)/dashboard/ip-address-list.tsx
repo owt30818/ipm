@@ -36,6 +36,7 @@ import {
 import { IpAddressWithSubnet, AuditLog } from "@/lib/types/database";
 import { useToast } from "@/hooks/use-toast";
 import { CopyIpButton } from "@/components/ip/copy-ip-button";
+import { formatDateTimeKst } from "@/lib/utils";
 import { toKoreanError } from "@/lib/errors";
 
 type IpStatus = "available" | "allocated" | "reserved" | "deprecated";
@@ -184,6 +185,9 @@ function IpCard({
               <p className="mt-1">
                 {ip.subnet?.name ?? "-"} ({ip.subnet?.cidr ?? "-"})
               </p>
+              <p className="mt-1 font-mono text-xs">
+                {ip.allocated_at ? `할당 ${formatDateTimeKst(ip.allocated_at)}` : `등록 ${formatDateTimeKst(ip.created_at)}`}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -253,10 +257,12 @@ function IpCard({
               <div>
                 <span className="text-sm text-muted-foreground">할당일:</span>
                 <p className="font-medium">
-                  {ip.allocated_at
-                    ? new Date(ip.allocated_at).toLocaleDateString("ko-KR")
-                    : "-"}
+                  {ip.allocated_at ? formatDateTimeKst(ip.allocated_at) : "-"}
                 </p>
+              </div>
+              <div>
+                <span className="text-sm text-muted-foreground">등록일시:</span>
+                <p className="font-medium">{formatDateTimeKst(ip.created_at)}</p>
               </div>
             </>
           )}
