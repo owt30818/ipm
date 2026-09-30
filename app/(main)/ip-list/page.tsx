@@ -141,7 +141,7 @@ export default async function IpListPage({
                     <CardTitle>IP 주소 목록</CardTitle>
                     <ExportButton />
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 pb-4">
                     {listError ? (
                         <ErrorNotice title="IP 목록을 불러오지 못했습니다" message={listError} />
                     ) : (

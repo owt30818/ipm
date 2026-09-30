@@ -27,7 +27,7 @@ export default async function MainLayout({
       {/* Main Content */}
       <div className="flex flex-col flex-1 min-w-0">
         <Header userEmail={user.email} role={role} />
-        <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
+        <main className="flex-1 overflow-auto p-4 pb-2 md:p-6 md:pb-3">{children}</main>
       </div>
 
       <Toaster />

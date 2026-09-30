@@ -110,7 +110,7 @@ export function PaginationControl({ total, page, limit }: PaginationControlProps
     };
 
     return (
-        <div className="flex items-center justify-between px-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-2">
             <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                 <p className="hidden sm:block">페이지당 행:</p>
                 <Select
