@@ -4,9 +4,6 @@ services:
     environment:
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY}
-    volumes:
-      # db-backup dumps, listed and downloadable (admin only) on /about
-      - ${BACKUP_DIR:-./backups}:/backups:ro
     restart: unless-stopped
     networks:
       - ipam-network
@@ -19,46 +16,6 @@ services:
     restart: unless-stopped
     depends_on:
       - app
-    networks:
-      - ipam-network
-
-  # Daily pg_dump of the Supabase Cloud DB (public + auth schemas).
-  # Self-contained so it also works when this file is pasted into TrueNAS "Install via YAML".
-  # The daily connection also keeps the free-tier project from pausing.
-  db-backup:
-    image: postgres:17-alpine
-    environment:
-      - PGHOST=${BACKUP_PGHOST}
-      - PGPORT=${BACKUP_PGPORT:-5432}
-      - PGUSER=${BACKUP_PGUSER}
-      - PGPASSWORD=${BACKUP_PGPASSWORD}
-      - PGDATABASE=postgres
-      - PGSSLMODE=require
-      - PGCONNECT_TIMEOUT=30
-      - BACKUP_KEEP_DAYS=${BACKUP_KEEP_DAYS:-14}
-      - BACKUP_INTERVAL_SECONDS=${BACKUP_INTERVAL_SECONDS:-86400}
-    volumes:
-      - ${BACKUP_DIR:-./backups}:/backups
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        umask 077
-        while true; do
-          ts=$$(date -u +%Y%m%d-%H%M%SZ)
-          out=/backups/ipam-$$ts.dump
-          if pg_dump -Fc -n public -n auth --no-owner --no-privileges -f "$$out.tmp"; then
-            mv "$$out.tmp" "$$out"
-            # 600 + owned by the app's nextjs user (uid 1001) so /about can serve it
-            chown 1001:1001 "$$out"
-            echo "[backup] OK $$out ($$(du -h "$$out" | cut -f1))"
-            find /backups -name 'ipam-*.dump' -mtime +$$BACKUP_KEEP_DAYS -delete
-          else
-            rm -f "$$out.tmp"
-            echo "[backup] FAILED $$ts" >&2
-          fi
-          sleep "$$BACKUP_INTERVAL_SECONDS"
-        done
-    restart: unless-stopped
     networks:
       - ipam-network
 

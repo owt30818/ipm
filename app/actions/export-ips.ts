@@ -5,6 +5,7 @@ import { getSessionProfile } from "@/lib/auth/session";
 import { toKoreanError } from "@/lib/errors";
 import { formatDateTimeKst } from "@/lib/utils";
 import { parseIpSort } from "@/lib/ip-sort";
+import { generateCsv } from "@/lib/csv";
 
 interface ExportFilters {
   status?: string;
@@ -20,24 +21,6 @@ const statusLabels: Record<string, string> = {
   reserved: "예약됨",
   deprecated: "사용 안 함",
 };
-
-// Spreadsheets run cells that start with = + - @ as formulas (CSV injection), so neutralize them
-function escapeCsvField(value: string): string {
-  let field = value;
-  if (/^[=+\-@\t\r]/.test(field)) {
-    field = `'${field}`;
-  }
-  if (/[",\n\r]/.test(field)) {
-    return `"${field.replace(/"/g, '""')}"`;
-  }
-  return field;
-}
-
-function generateCsv(headers: string[], rows: string[][]): string {
-  const headerLine = headers.map(escapeCsvField).join(",");
-  const dataLines = rows.map((row) => row.map(escapeCsvField).join(","));
-  return [headerLine, ...dataLines].join("\n");
-}
 
 function dateKst(iso: string | null): string {
   return iso ? formatDateTimeKst(iso) : "";

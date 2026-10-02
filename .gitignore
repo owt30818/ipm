@@ -50,6 +50,3 @@ postgres_data/
 # IPM SaaS 기술 문서
 TECHNICAL_DOCS.md
 truenas-compose.yml
-
-# DB backups (docker-compose db-backup)
-/backups/

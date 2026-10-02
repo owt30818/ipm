@@ -165,7 +165,7 @@ Never show `error.message` from Supabase/Postgres directly. Use `toKoreanError(e
 | `/allocate` | IP allocation forms (subnet selection, quantity input, CSV upload) |
 | `/dashboard` | IP search and status overview with filtering |
 | `/settings` | Profile, user management (admin), audit log viewer |
-| `/about` | App version/build date/commit, installed package versions (from `next.config.ts` build metadata), DB backup status + admin-only dump downloads (`lib/backups.ts`, `/api/backups/[name]`; dumps come from the `db-backup` compose service mounted read-only at `/backups`) |
+| `/about` | App version/build date/commit, installed package versions (from `next.config.ts` build metadata), admin-only CSV backups of subnets / IPs / audit logs (`/api/backups/[table]`) and the daily Supabase keep-alive status (`instrumentation.ts` → `lib/keep-alive.ts`, prevents the free-tier pause) |
 
 ### User Management (Settings Page)
 
