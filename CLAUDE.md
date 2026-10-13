@@ -189,6 +189,7 @@ Never show `error.message` from Supabase/Postgres directly. Use `toKoreanError(e
 - **Auth forms:** Include Cloudflare Turnstile widget
 - **Dialogs:** Used for password change and user creation (inline JSX, not function components to avoid re-render issues)
 - **Header:** User email links to `/settings` page
+- **Saved searches (IP list):** "자주 쓰는 검색" chips under the search filters (`app/(main)/dashboard/saved-searches.tsx`, logic in `lib/saved-searches.ts`). They store the URL filter params (status/subnet/description/ip/sort) in the browser's `localStorage`, so they are per browser, not per account. To sync across devices, swap `loadSavedSearches` / `storeSavedSearches` for a DB-backed version (new migration + RLS by `auth.uid()`).
 
 ## Security Notes
 

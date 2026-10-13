@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { DEFAULT_IP_SORT, IP_SORTS, IP_SORT_LABELS, parseIpSort } from "@/lib/ip-sort";
+import { SavedSearches } from "./saved-searches";
 
 interface Subnet {
   id: string;
@@ -105,7 +106,9 @@ export function SearchFilters({ subnets }: SearchFiltersProps) {
               updateFilters("description", formData.get("description") as string);
             }}
           >
+            {/* key: remount when the URL value changes (saved search, reset) so the text follows it */}
             <Input
+              key={description}
               name="description"
               placeholder="설명 또는 할당 대상..."
               defaultValue={description}
@@ -124,6 +127,7 @@ export function SearchFilters({ subnets }: SearchFiltersProps) {
             }}
           >
             <Input
+              key={ipAddress}
               name="ip"
               placeholder="예: 192.168.1"
               defaultValue={ipAddress}
@@ -164,6 +168,8 @@ export function SearchFilters({ subnets }: SearchFiltersProps) {
           </Button>
         </div>
       </div>
+
+      <SavedSearches subnets={subnets} />
 
       {hasFilters && (
         <div className="text-sm text-muted-foreground">
