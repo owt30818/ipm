@@ -111,6 +111,8 @@ const { data: { user } } = await supabase.auth.getUser();
 
 RPCs are executable by `authenticated` only (never `anon`). Migrations 009/010 enforce this; keep `REVOKE ... FROM PUBLIC, anon` in any new function.
 
+Since 2026-10-30 Supabase no longer grants Data API access to new `public` tables automatically. A migration that creates a table must `GRANT` in the same file (`authenticated` only what RLS expects, nothing to `anon`, `service_role` all). Migration 013 does this for the four existing tables so a rebuilt schema (`supabase db reset`, new project, preview branch) keeps working.
+
 ### DB triggers (migration 010)
 
 - `ip_addresses`: an IP must lie inside its subnet (checked on insert and when `ip_address`/`subnet_id` change)
