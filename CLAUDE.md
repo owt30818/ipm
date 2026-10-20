@@ -25,6 +25,8 @@ npm run build        # Build for production
 npm run lint         # Run ESLint
 ```
 
+`next.config.ts` sets `typescript.ignoreBuildErrors` and `eslint.ignoreDuringBuilds`, so a green `npm run build` does not mean the types are clean; check with `npx tsc --noEmit`.
+
 ### Supabase CLI
 
 ```bash
@@ -57,6 +59,14 @@ To get `SUPABASE_SERVICE_ROLE_KEY` for local development:
 npx supabase status  # Look for "Secret" key
 ```
 
+## Deployment & Versioning
+
+- A push to `main` runs `.github/workflows/docker.yml`, which builds and pushes `ghcr.io/owt30818/ipm:latest` (and `:<sha>`). Production is a TrueNAS app that pulls this image, behind a Cloudflare Tunnel (`cloudflared`). Its YAML is `truenas-compose.yml` (gitignored, holds the runtime env).
+- Nothing applies migrations. Run new `supabase/migrations/*.sql` by hand on the Supabase project, and before deploying an image that needs them.
+- The version on `/about` and in the sidebar is `package.json` major.minor plus the commit count (`BUILD_NUMBER` in CI), so edit `package.json` only for a major/minor bump.
+- Legacy, superseded by the GHCR flow: `deploy.sh`, `build-push.sh` and `docker-compose.yml` (Docker Hub `owt30818/ipam-app`, `NEXT_PUBLIC_*` build args), `ipm-saas.service`.
+- DB backups are not part of this repo. A separate stack on the home server (`~/ipam-db-backup`) runs a daily `pg_dump -Fc` of `public` + `auth` with `--no-privileges` and 14-day retention, so grants are not in the dumps: restore data into a schema built from the migrations (incl. 013), see the comments in its compose file. In-app backup variants live on the `csv-backup` branch; do not add them to main unless asked.
+
 ## Architecture
 
 ### Folder Structure
@@ -64,26 +74,37 @@ npx supabase status  # Look for "Secret" key
 ```
 app/
   (auth)/          # Login page (public) - signup removed for security
-  (main)/          # Protected pages (dashboard, allocate, settings)
+  (main)/          # Protected pages: dashboard, ip-list, allocate, settings, about
+                   # (its layout redirects to /login without a session)
+    dashboard/     # Per-subnet stats page, plus the IP list components that ip-list/ reuses
+                   # (table, mobile cards, search filters, saved searches, export button)
   actions/         # Server Actions
-    allocate-ips.ts
-    bulk-update-ips.ts
-    bulk-delete-ips.ts
-    create-user.ts       # Admin: create new users
-    update-password.ts   # User: change own password
-  api/             # API routes
+    allocate-ips.ts, get-next-available-ip.ts
+    bulk-update-ips.ts, bulk-delete-ips.ts
+    export-ips.ts            # CSV export (any logged-in user)
+    create-user.ts           # Admin: create new users
+    delete-user.ts           # Admin: delete a user (never yourself)
+    admin-update-password.ts # Admin: reset another user's password
+    update-password.ts       # User: change own password
+  api/             # API routes: audit-logs, ip-addresses/[id] (GET/PATCH/DELETE),
+                   # users/[id]/role, auth/verify-turnstile
+  auth/callback/   # Supabase auth callback
 components/
   auth/            # Login form with Turnstile
   layout/          # Header (links to settings), Sidebar, MobileNav
-  ip/              # IP detail dialog, audit log list
-  ui/              # Shadcn/ui primitives
+  ip/              # IP detail dialog, audit log list, copy button
+  ui/              # Shadcn/ui primitives, ErrorNotice
+  pagination-control.tsx   # Pagination + page-size select (10/20/30/50/100, default 50)
 lib/
   supabase/
     client.ts      # Browser client (use in Client Components)
     server.ts      # Server client (use in Server Components/Actions)
     admin.ts       # Admin client (use for user management, bypasses RLS)
+  auth/session.ts  # getSessionProfile()
   types/
     database.ts    # Supabase generated types
+  csv-import.ts, ip-sort.ts, saved-searches.ts, roles.ts, errors.ts, env.ts, build-info.ts
+supabase/migrations/   # 001-013
 ```
 
 ### Supabase Client Usage
@@ -137,6 +158,7 @@ Rules live in `lib/roles.ts` and mirror the RLS policies (the database stays the
 | Action | admin | sub_admin | user |
 |--------|:-----:|:---------:|:----:|
 | View IPs, subnets, dashboard | ✓ | ✓ | ✓ |
+| Export the IP list to CSV | ✓ | ✓ | ✓ |
 | Register / edit / allocate IPs, register / edit subnets (`canManage`) | ✓ | ✓ | |
 | Delete IPs and subnets (`canDelete`) | ✓ | | |
 
@@ -164,8 +186,9 @@ Never show `error.message` from Supabase/Postgres directly. Use `toKoreanError(e
 | Route | Purpose |
 |-------|---------|
 | `/login` | Login page with Turnstile protection |
-| `/allocate` | IP allocation forms (subnet selection, quantity input, CSV upload) |
-| `/dashboard` | IP search and status overview with filtering |
+| `/dashboard` | Per-subnet capacity overview (totals cards + table with available/allocated/reserved/unregistered and usage rate) |
+| `/ip-list` | IP search (status/subnet/description/IP), sort, saved searches, bulk status change/delete, CSV export, IP detail dialog with change history |
+| `/allocate` | admin/sub_admin only. Tabs: single allocation (one IP with the next free IP prefilled, or "auto" N contiguous IPs, UI max 256), CSV upload, subnet management |
 | `/settings` | Profile, user management (admin), audit log viewer |
 | `/about` | App version/build date/commit and installed package versions (from `next.config.ts` build metadata) |
 
@@ -175,13 +198,15 @@ Never show `error.message` from Supabase/Postgres directly. Use `toKoreanError(e
 - View account info (email, role, join date)
 - Change password via dialog
 
-**User Management Tab (admin only):**
+**User Management Tab (admin only; actions check the role again server-side):**
 - View all users with role badges
-- Add new users (sub_admin/user) via dialog
-- Change user roles via dropdown
+- Add new users (sub_admin/user, password min 6) via dialog
+- Change user roles via dropdown (not your own role)
+- Reset another user's password, delete a user (not yourself)
 
 **Audit Log Tab (admin/sub_admin):**
-- View system change history
+- View system change history (badges: 생성/수정/삭제/할당/해제), 50 rows at a time
+- The IP detail dialog has a per-IP "변경 이력" tab fed by the same `/api/audit-logs`
 
 ## UI Patterns
 
