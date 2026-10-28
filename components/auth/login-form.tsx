@@ -14,6 +14,8 @@ export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  // Bumping the key remounts the widget for a fresh token (each token is single-use)
+  const [turnstileKey, setTurnstileKey] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
@@ -33,22 +35,13 @@ export function LoginForm() {
     setIsLoading(true);
 
     try {
-      // Verify Turnstile token
-      const verifyResponse = await fetch("/api/auth/verify-turnstile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: turnstileToken }),
-      });
-
-      if (!verifyResponse.ok) {
-        throw new Error("보안 검증에 실패했습니다.");
-      }
-
-      // Sign in with Supabase
+      // Supabase Auth verifies the Turnstile token itself (Dashboard → Attack Protection),
+      // so the check cannot be skipped by calling the Auth API directly
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
+        options: { captchaToken: turnstileToken },
       });
 
       if (error) {
@@ -68,6 +61,8 @@ export function LoginForm() {
         description: toKoreanError(error),
         variant: "destructive",
       });
+      setTurnstileToken(null);
+      setTurnstileKey((key) => key + 1);
     } finally {
       setIsLoading(false);
     }
@@ -110,6 +105,7 @@ export function LoginForm() {
             />
           </div>
           <Turnstile
+            key={turnstileKey}
             onVerify={setTurnstileToken}
             onExpire={() => setTurnstileToken(null)}
             onError={() => {

@@ -1,3 +1,4 @@
+import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { Database } from "@/lib/types/database";
 import { getPublicEnv } from "@/lib/env";

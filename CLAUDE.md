@@ -48,7 +48,7 @@ docker compose up --build                     # Production build
 Copy `.env.example` to `.env.local` and configure:
 - `SUPABASE_URL` / `SUPABASE_ANON_KEY` - Supabase project credentials
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (for admin user creation)
-- `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` - Cloudflare Turnstile keys
+- `TURNSTILE_SITE_KEY` - Cloudflare Turnstile site key. The secret key is not an app env var: it goes in the Supabase Dashboard (Authentication → Attack Protection → CAPTCHA, provider Turnstile), and Supabase Auth checks the token on `signInWithPassword`
 
 All of these are read at runtime via `lib/env.ts` (the Docker image contains no config).
 The root layout injects the public ones into the browser as `window.__ENV`.
@@ -87,7 +87,7 @@ app/
     admin-update-password.ts # Admin: reset another user's password
     update-password.ts       # User: change own password
   api/             # API routes: audit-logs, ip-addresses/[id] (GET/PATCH/DELETE),
-                   # users/[id]/role, auth/verify-turnstile
+                   # users/[id]/role
   auth/callback/   # Supabase auth callback
 components/
   auth/            # Login form with Turnstile
@@ -213,14 +213,14 @@ Never show `error.message` from Supabase/Postgres directly. Use `toKoreanError(e
 - **Mobile details:** Bottom Sheet (not new page) for IP details + audit log
 - **Data tables:** Desktop uses `<Table>`, mobile uses card-based list
 - **CSV upload:** Drag & drop on desktop, file picker button on mobile
-- **Auth forms:** Include Cloudflare Turnstile widget
+- **Auth forms:** Include Cloudflare Turnstile widget and pass its token as `options.captchaToken` to Supabase Auth (a token is single-use: remount the widget after a failed attempt). Do not verify it in a separate app route; that check can be skipped by calling the Auth API directly
 - **Dialogs:** Used for password change and user creation (inline JSX, not function components to avoid re-render issues)
 - **Header:** User email links to `/settings` page
 - **Saved searches (IP list):** "자주 쓰는 검색" chips under the search filters (`app/(main)/dashboard/saved-searches.tsx`, logic in `lib/saved-searches.ts`). They store the URL filter params (status/subnet/description/ip/sort) in the browser's `localStorage`, so they are per browser, not per account. To sync across devices, swap `loadSavedSearches` / `storeSavedSearches` for a DB-backed version (new migration + RLS by `auth.uid()`).
 
 ## Security Notes
 
-- **No public signup:** User registration is admin-only to prevent unauthorized access
-- **Service Role Key:** Never expose `SUPABASE_SERVICE_ROLE_KEY` to client-side code
+- **No public signup:** User registration is admin-only. The app has no signup page, and Supabase Auth must also have "Allow new users to sign up" off; otherwise anyone with the public anon key can call `/auth/v1/signup` and read all data as `user`
+- **Service Role Key:** Never expose `SUPABASE_SERVICE_ROLE_KEY` to client-side code. `lib/supabase/admin.ts` and `server.ts` import `server-only`, so importing them from a Client Component fails the build
 - **Password requirements:** Minimum 6 characters
 - **Role hierarchy:** admin > sub_admin > user

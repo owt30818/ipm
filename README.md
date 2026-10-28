@@ -95,12 +95,12 @@ SUPABASE_URL=your_supabase_url
 SUPABASE_ANON_KEY=your_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 TURNSTILE_SITE_KEY=your_turnstile_site_key
-TURNSTILE_SECRET_KEY=your_turnstile_secret_key
 ```
 
 - 모두 **실행 시점**에 읽으므로 빌드할 때는 필요하지 않습니다.
 - 로컬 개발에서는 예전 이름(`NEXT_PUBLIC_SUPABASE_URL` 등)도 그대로 동작합니다.
 - `SUPABASE_SERVICE_ROLE_KEY` 는 서버에서만 사용하며 브라우저로 내보내지 않습니다.
+- Turnstile 시크릿 키는 앱 환경 변수가 아니라 Supabase Dashboard → Authentication → Attack Protection 의 CAPTCHA(Turnstile) 설정에 넣습니다. 로그인 토큰은 Supabase Auth가 직접 검증합니다.
 
 ## 🗄 데이터베이스
 
