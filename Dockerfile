@@ -36,6 +36,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# The app only runs `node server.js`. Drop the base image's npm/yarn so their
+# bundled dependencies are not in the image (Trivy flags them as "image npm")
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+    /opt/yarn* /usr/local/bin/yarn /usr/local/bin/yarnpkg
+
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static

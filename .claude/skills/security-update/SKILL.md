@@ -40,7 +40,7 @@ description: IPAM 앱(이 저장소)의 Node.js 기반 이미지, npm 패키지,
 | npm 같은 메이저 안의 업데이트 / `npm audit fix`로 해결 | 적용 |
 | `(MAJOR)`로만 해결 / `no fix` | 적용하지 않음. 요약에 알림 |
 | Trivy `os` | 기반 이미지를 다시 빌드하면 대부분 해결된다 (Node 태그를 올리거나 같은 태그로 다시 빌드) |
-| Trivy `image npm` | 앱이 실행하지 않는 코드다(CMD는 `node server.js`). 위험이 낮으므로 알리기만 한다. 없애려면 runner 단계에서 npm을 지우는 방법이 있다(아래 "알려진 항목") |
+| Trivy `image npm` | 2026-10-28부터 `Dockerfile` runner 단계가 npm/yarn을 지우므로 나오지 않아야 한다. 나오면 그 `RUN rm -rf` 줄이 빠졌거나 경로가 바뀐 것이니 확인한다 |
 
 ## 2. 적용
 
@@ -92,5 +92,4 @@ npx tsc --noEmit 2>&1 | grep -c "error TS"; npm run lint 2>&1 | tail -6; npm run
 
 - `postcss 8.4.31` (next 안에 들어 있음): 운영 이미지에 들어 있지만 CSS를 처리할 때만 쓰인다. next 16으로 올려야 해결된다.
 - braces, micromatch, chokidar, postcss-selector-parser: tailwind 3과 eslint-config-next에 딸린 빌드 도구라 운영 이미지에는 없다. tailwind 4로 올려야 해결된다.
-- `image npm`(brace-expansion, pacote, sigstore 등): `node:22-alpine`에 들어 있는 npm의 의존성이다. 없애려면 `Dockerfile` runner 단계에
-  `RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /opt/yarn* /usr/local/bin/yarn*`를 넣는다. 사용자가 원할 때만 적용한다.
+- `image npm`: 해결됨 (2026-10-28). runner 단계에서 기반 이미지의 npm/npx/yarn을 지운다. 앱은 `node server.js`만 실행하므로 영향이 없다.
